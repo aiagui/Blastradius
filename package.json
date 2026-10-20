@@ -1,5 +1,5 @@
 {
-  "name": "blastradius",
+  "name": "@aiagui/blastradius",
   "version": "0.1.0",
   "description": "Find out what the secrets in your .env can actually do. Live, read-only checks with a red/amber/green report.",
   "license": "MIT",
@@ -24,6 +24,10 @@
   ],
   "engines": {
     "node": ">=22.13"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
   },
   "scripts": {
     "prebuild": "node scripts/gen-connectors.mjs",

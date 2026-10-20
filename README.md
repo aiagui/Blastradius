@@ -39,13 +39,13 @@ Needs Node 22.13 or newer. Run it in your project without installing anything:
 
 ```sh
 cd your-project
-npx blastradius
+npx @aiagui/blastradius
 ```
 
-Or install it globally and point it at a directory:
+Or install it globally (the command is still `blastradius`):
 
 ```sh
-npm install -g blastradius
+npm install -g @aiagui/blastradius
 blastradius --dir ~/code/your-project
 ```
 
