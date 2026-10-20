@@ -4,7 +4,7 @@
 
 Please do not open a public issue. Report vulnerabilities privately through
 GitHub's private vulnerability reporting:
-[Report a vulnerability](https://github.com/aiagui/blastradius/security/advisories/new)
+[Report a vulnerability](https://github.com/aiagui/Blastradius/security/advisories/new)
 ("Report a vulnerability" in the Security tab). The maintainer enables private
 vulnerability reporting when the repository is public. We aim to reply within
 7 days.
