@@ -40,8 +40,14 @@ with one required approving review.
 2. After it is merged, tag the merge commit and push the tag:
    `git tag vX.Y.Z && git push origin vX.Y.Z`.
 3. The release workflow runs the checks, publishes to npm with provenance and
-   creates the GitHub release from the changelog entry. It needs an npm
-   automation token in the `NPM_TOKEN` repository secret.
+   creates the GitHub release from the changelog entry. Only tags on commits
+   that are already on `main` are published.
+
+The publish job runs in the `npm` GitHub environment (Settings > Environments).
+Add a required reviewer there so a pushed tag waits for approval before
+anything reaches npm, and store the npm automation token as the environment's
+`NPM_TOKEN` secret. GitHub creates the environment on the first run if it
+doesn't exist yet, but without any protection rules.
 
 ## Local checks
 

@@ -1,7 +1,8 @@
 name: Release
 
 # Pushing a tag like v0.1.0 publishes that version to npm and creates the
-# GitHub release. Needs an npm automation token in the NPM_TOKEN secret.
+# GitHub release. The publish job runs in the `npm` environment (add required
+# reviewers there) and needs an npm automation token in its NPM_TOKEN secret.
 
 on:
   push:
@@ -19,6 +20,7 @@ jobs:
     name: Check and publish to npm
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    environment: npm
     permissions:
       contents: read
       id-token: write # npm provenance
