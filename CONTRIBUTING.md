@@ -45,9 +45,26 @@ with one required approving review.
 
 The publish job runs in the `npm` GitHub environment (Settings > Environments).
 Add a required reviewer there so a pushed tag waits for approval before
-anything reaches npm, and store the npm automation token as the environment's
-`NPM_TOKEN` secret. GitHub creates the environment on the first run if it
+anything reaches npm. GitHub creates the environment on the first run if it
 doesn't exist yet, but without any protection rules.
+
+### npm authentication
+
+npm can only set up trusted publishing (OIDC) for a package that already
+exists, so the first release uses a token:
+
+1. For v0.1.0, create a short-lived granular access token on npmjs.com with
+   read and write access, and save it as the `NPM_TOKEN` secret of the `npm`
+   environment.
+2. After v0.1.0 is published, open `@aiagui/blastradius` on npmjs.com,
+   Settings > Trusted publishing, and add GitHub Actions with repository
+   `aiagui/Blastradius`, workflow `release.yml` and environment `npm`.
+3. Delete the `NPM_TOKEN` secret and revoke the token on npmjs.com.
+
+The workflow needs no change: npm tries OIDC first and only falls back to the
+token when trusted publishing isn't set up. Trusted publishing needs npm 11.5.1
+or newer, which the workflow installs. See
+<https://docs.npmjs.com/trusted-publishers>.
 
 ## Local checks
 
