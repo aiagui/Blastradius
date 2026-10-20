@@ -32,6 +32,17 @@ with one required approving review.
 - [Semantic Versioning](https://semver.org/). Add user-visible changes to the
   `Unreleased` section of [CHANGELOG.md](CHANGELOG.md).
 
+## Releasing
+
+1. In a pull request, set `version` in `package.json` and `src/version.ts`, run
+   `npm install` to update the lockfile, and move the `Unreleased` entries to a
+   new `## [x.y.z] - YYYY-MM-DD` section in the changelog.
+2. After it is merged, tag the merge commit and push the tag:
+   `git tag vX.Y.Z && git push origin vX.Y.Z`.
+3. The release workflow runs the checks, publishes to npm with provenance and
+   creates the GitHub release from the changelog entry. It needs an npm
+   automation token in the `NPM_TOKEN` repository secret.
+
 ## Local checks
 
 ```sh

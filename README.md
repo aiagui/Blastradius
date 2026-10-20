@@ -33,26 +33,31 @@ v0.1 checks **GitHub**, **Vercel** and **Stripe** credentials.
 </p>
 <p align="center"><sub>Recorded with <code>--offline</code> against obviously fake keys. Nothing was sent anywhere.</sub></p>
 
-> **Status:** pre-release (`0.1.0-dev`). Not published to npm yet.
-
 ## Quick start
 
-Until the first release, run it from source (Node 22.13 or newer):
+Needs Node 22.13 or newer. Run it in your project without installing anything:
+
+```sh
+cd your-project
+npx blastradius
+```
+
+Or install it globally and point it at a directory:
+
+```sh
+npm install -g blastradius
+blastradius --dir ~/code/your-project
+```
+
+Want to try it without touching the network first? Add `--offline`.
+
+### From source
 
 ```sh
 git clone https://github.com/aiagui/Blastradius.git
 cd Blastradius
 npm ci && npm run build
 node dist/cli.js --dir ~/code/your-project
-```
-
-Want to try it without touching the network first? Add `--offline`.
-
-**Coming soon**, once it is published to npm:
-
-```sh
-cd your-project
-npx blastradius
 ```
 
 ## Reading the report
@@ -80,7 +85,7 @@ Every credential gets one of three levels:
 ### Example output
 
 ```text
-blastradius 0.1.0-dev  ~/code/acme-web
+blastradius 0.1.0  ~/code/acme-web
 Scanned: .env, .env.local
 
 ● RED    GitHub  GITHUB_TOKEN  ghp_… (40 chars)  in .env.local  [confirmed]
