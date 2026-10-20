@@ -6,7 +6,7 @@
 
 [![CI](https://github.com/aiagui/Blastradius/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/aiagui/Blastradius/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
-![node 20+](https://img.shields.io/badge/node-20%2B-339933?logo=node.js&logoColor=white)
+![node 22.13+](https://img.shields.io/badge/node-22.13%2B-339933?logo=node.js&logoColor=white)
 ![TypeScript strict](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
 ![Zero runtime dependencies](https://img.shields.io/badge/runtime%20deps-0-brightgreen)
 ![Read-only checks](https://img.shields.io/badge/checks-read--only-informational)
@@ -37,7 +37,7 @@ v0.1 checks **GitHub**, **Vercel** and **Stripe** credentials.
 
 ## Quick start
 
-Until the first release, run it from source (Node 20 or newer):
+Until the first release, run it from source (Node 22.13 or newer):
 
 ```sh
 git clone https://github.com/aiagui/Blastradius.git
