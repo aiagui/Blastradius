@@ -11,7 +11,7 @@ First release, v0.1.
 
 ### Added
 
-- `blastradius` CLI with `--dir`, `--env-file`, `--offline`, `--json`, `--fail-on` and `--no-color`; strict TypeScript, ESM, Node >= 20, zero runtime dependencies.
+- `blastradius` CLI with `--dir`, `--env-file`, `--offline`, `--json`, `--fail-on` and `--no-color`; strict TypeScript, ESM, Node >= 22.12, zero runtime dependencies.
 - dotenv parser for `.env*` files (skips `*.example`, `*.sample`, `*.template`).
 - `Secret` type with redacted string, JSON and inspect output.
 - `safeFetch`, the only network primitive: per-connector allowlists, GraphQL by document hash, host binding for secrets, no redirects, `discardBody`.
@@ -22,7 +22,7 @@ First release, v0.1.
 - Stripe connector: classifies `sk_`, `rk_` and `pk_` keys (live/test), confirms secret keys with one `GET /v1/balance`, probes restricted keys with read-only calls (bodies discarded), says why a probe failed (blocked, unreachable or the HTTP status) and always reports write permissions as unknown. A rejected live key stays amber; rejected test keys are green/inferred.
 - Vercel connector: `vcp_`/`vci_`/`vca_`/`vcr_` and legacy tokens; risk from token scope (full account or team) and team role; flags tokens Vercel marked as leaked.
 - README with a PNG banner (SVG sources kept in `docs/assets/`), badges, red/amber/green legend, demo GIF recorded offline on fake keys, example output from the real CLI, and collapsible technical sections.
-- CI on GitHub Actions: typecheck, lint (bans direct network APIs), tests including a canary leak test, build and offline smoke tests (basic fixture and canary) on Node 20 and 22; opt-in CodeQL scanning (`ENABLE_CODEQL`); Dependabot for npm and GitHub Actions updates; secret scanning ignores `test/`. Fake-credential fixtures with real key formats are generated at test time (`scripts/make-fixture.mjs`), never committed.
+- CI on GitHub Actions: typecheck, lint (bans direct network APIs), tests including a canary leak test, build and offline smoke tests (basic fixture and canary) on Node 22 and 24; opt-in CodeQL scanning (`ENABLE_CODEQL`); Dependabot for npm and GitHub Actions updates; secret scanning ignores `test/`. Fake-credential fixtures with real key formats are generated at test time (`scripts/make-fixture.mjs`), never committed.
 - `SECURITY.md` (private vulnerability reporting) and `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1).
 
 ### Fixed

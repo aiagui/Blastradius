@@ -105,7 +105,7 @@ describe("safeFetch allowlist", () => {
 
   it("rejects sending a secret to a host it is not bound to", () => {
     const otherList: Allowlist = { connector: "t", rules: [{ method: "GET", host: "other.test", path: "/user" }] };
-    expect(() => assertAllowed(otherList, { method: "GET", url: "https://other.test/user", secret })).toThrowError(
+    expect(() => assertAllowed(otherList, { method: "GET", url: "https://other.test/user", secret })).toThrow(
       expect.objectContaining({ code: "secret_host_mismatch" }) as Error,
     );
   });

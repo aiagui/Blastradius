@@ -37,7 +37,7 @@ v0.1 checks **GitHub**, **Vercel** and **Stripe** credentials.
 
 ## Quick start
 
-Until the first release, run it from source (Node 20 or newer):
+Until the first release, run it from source (Node 22.12 or newer):
 
 ```sh
 git clone https://github.com/aiagui/blastradius.git
