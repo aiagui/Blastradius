@@ -52,7 +52,9 @@ jobs:
             echo "::error::Tag $TAG does not match package.json version $version."
             exit 1
           fi
-      - run: npm publish --provenance --access public
+      # --ignore-scripts: the checks and the build already ran above, so no
+      # package script (or devDependency code) runs while the token is set.
+      - run: npm publish --provenance --access public --ignore-scripts
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
