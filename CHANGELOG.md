@@ -11,7 +11,7 @@ First release, v0.1.
 
 ### Added
 
-- `blastradius` CLI with `--dir`, `--env-file`, `--offline`, `--json`, `--fail-on` and `--no-color`; strict TypeScript, ESM, Node >= 22.12, zero runtime dependencies.
+- `blastradius` CLI with `--dir`, `--env-file`, `--offline`, `--json`, `--fail-on` and `--no-color`; strict TypeScript, ESM, Node >= 22.13, zero runtime dependencies.
 - dotenv parser for `.env*` files (skips `*.example`, `*.sample`, `*.template`).
 - `Secret` type with redacted string, JSON and inspect output.
 - `safeFetch`, the only network primitive: per-connector allowlists, GraphQL by document hash, host binding for secrets, no redirects, `discardBody`.

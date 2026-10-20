@@ -24,7 +24,7 @@
     "CHANGELOG.md"
   ],
   "engines": {
-    "node": ">=22.12"
+    "node": ">=22.13"
   },
   "scripts": {
     "prebuild": "node scripts/gen-connectors.mjs",
