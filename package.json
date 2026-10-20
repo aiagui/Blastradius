@@ -18,6 +18,7 @@
   },
   "files": [
     "dist",
+    "!dist/connectors/example.*",
     "README.md",
     "LICENSE",
     "CHANGELOG.md"
