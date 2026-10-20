@@ -64,15 +64,13 @@ jobs:
             exit 1
           fi
       # Trusted publishing needs npm 11.5.1 or newer; Node 22 ships npm 10.
+      # Pinned to an exact version because this binary runs with the token.
       - name: Install npm 11
         run: |
-          npm install -g --ignore-scripts npm@^11.5.1
+          npm install -g --ignore-scripts npm@11.21.1
           v="$(npm --version)"
           echo "npm $v"
-          node -e '
-            const [a, b, c] = process.argv[1].split(".").map(Number);
-            if (a < 11 || (a === 11 && (b < 5 || (b === 5 && c < 1)))) process.exit(1);
-          ' "$v" || { echo "::error::npm $v is older than 11.5.1."; exit 1; }
+          test "$v" = "11.21.1" || { echo "::error::Expected npm 11.21.1, got $v."; exit 1; }
       # npm uses OIDC when a trusted publisher is configured and only falls
       # back to NODE_AUTH_TOKEN otherwise, so the secret can be removed later
       # without touching this file.
