@@ -36,7 +36,7 @@ This Code of Conduct applies within all community spaces, and also applies when 
 
 ## Enforcement
 
-Instances of abusive, harassing, or otherwise unacceptable behavior may be reported to the community leaders responsible for enforcement at a [GitHub issue](https://github.com/aiagui/blastradius/issues) on this repository or, if the matter should not be public, privately through the repository's Security tab ([Report a vulnerability](https://github.com/aiagui/blastradius/security/advisories/new)). All complaints will be reviewed and investigated promptly and fairly.
+Instances of abusive, harassing, or otherwise unacceptable behavior may be reported to the community leaders responsible for enforcement at a [GitHub issue](https://github.com/aiagui/Blastradius/issues) on this repository or, if the matter should not be public, privately through the repository's Security tab ([Report a vulnerability](https://github.com/aiagui/Blastradius/security/advisories/new)). All complaints will be reviewed and investigated promptly and fairly.
 
 All community leaders are obligated to respect the privacy and security of the reporter of any incident.
 

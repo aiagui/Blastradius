@@ -4,7 +4,7 @@
 
 <p align="center">
 
-[![CI](https://github.com/aiagui/blastradius/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/aiagui/blastradius/actions/workflows/ci.yml)
+[![CI](https://github.com/aiagui/Blastradius/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/aiagui/Blastradius/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 ![node 20+](https://img.shields.io/badge/node-20%2B-339933?logo=node.js&logoColor=white)
 ![TypeScript strict](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
@@ -40,8 +40,8 @@ v0.1 checks **GitHub**, **Vercel** and **Stripe** credentials.
 Until the first release, run it from source (Node 20 or newer):
 
 ```sh
-git clone https://github.com/aiagui/blastradius.git
-cd blastradius
+git clone https://github.com/aiagui/Blastradius.git
+cd Blastradius
 npm ci && npm run build
 node dist/cli.js --dir ~/code/your-project
 ```

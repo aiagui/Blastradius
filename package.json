@@ -7,11 +7,11 @@
   "author": "Aitor Aguilar",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/aiagui/blastradius.git"
+    "url": "git+https://github.com/aiagui/Blastradius.git"
   },
-  "homepage": "https://github.com/aiagui/blastradius#readme",
+  "homepage": "https://github.com/aiagui/Blastradius#readme",
   "bugs": {
-    "url": "https://github.com/aiagui/blastradius/issues"
+    "url": "https://github.com/aiagui/Blastradius/issues"
   },
   "type": "module",
   "bin": {
@@ -45,9 +45,16 @@
     "security",
     "secrets",
     "dotenv",
+    "env",
     "credentials",
     "blast-radius",
-    "cli"
+    "secret-scanning",
+    "devsecops",
+    "github",
+    "vercel",
+    "stripe",
+    "cli",
+    "developer-tools"
   ],
   "devDependencies": {
     "@eslint/js": "^10.0.1",
