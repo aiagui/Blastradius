@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  # Cancel superseded runs on PRs only; every push to main runs to completion.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  check:
+    name: typecheck, lint, test, build (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20, 22]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      # Each script regenerates src/connectors/registry.generated.ts first
+      # (pre* hooks; Vitest also does it in its globalSetup).
+      - run: npm run typecheck
+      - run: npm run lint
+      # Includes the secret canary test and the read-only allowlist tests.
+      - run: npm test
+      - run: npm run build
+      # Fake-credential fixtures are generated, not committed (scripts/make-fixture.mjs).
+      - run: npm run fixtures
+      - name: Smoke test the built CLI on the basic fixture (offline)
+        run: |
+          out="$(node dist/cli.js --dir .fixtures/basic --offline --no-color)"
+          printf '%s\n' "$out"
+          grep -q 'STRIPE_SECRET_KEY' <<<"$out"
+      - name: Canary smoke test (offline, output must not contain CANARY)
+        run: |
+          out="$(node dist/cli.js --dir .fixtures/canary --offline --no-color 2>&1)"
+          if grep -q 'CANARY' <<<"$out"; then
+            echo "::error::A canary secret value reached the CLI output."
+            exit 1
+          fi
+          echo "Canary run clean: $(grep -c '●' <<<"$out") findings, no CANARY in the output."

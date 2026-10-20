@@ -1,0 +1,1 @@
+{ "id": "team_acme123", "slug": "acme", "name": "Acme", "membership": { "role": "VIEWER_FOR_PLUS", "confirmed": true, "created": 1, "createdAt": 1 } }

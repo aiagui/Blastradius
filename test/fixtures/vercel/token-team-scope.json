@@ -1,0 +1,1 @@
+{ "token": { "id": "tok1", "name": "acme deploy", "type": "oauth2-token", "origin": "manual", "activeAt": 1760000000000, "createdAt": 1750000000000, "scopes": [{ "type": "team", "teamId": "team_acme123", "origin": "manual", "createdAt": 1750000000000 }] } }

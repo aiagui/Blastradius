@@ -1,0 +1,1 @@
+{ "token": { "id": "tok2", "name": "old", "type": "oauth2-token", "origin": "manual", "activeAt": 1760000000000, "createdAt": 1700000000000, "leakedAt": 1759276800000, "leakedUrl": "https://github.com/someone/repo/blob/main/.env", "scopes": [{ "type": "user", "origin": "manual", "createdAt": 1700000000000 }] } }
