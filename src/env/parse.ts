@@ -60,7 +60,7 @@ export function parseEnv(content: string, source = ".env"): EnvEntry[] {
     i = eq + 1;
     while (i < len && (text[i] === " " || text[i] === "\t")) i++;
 
-    let value = "";
+    let value: string;
     const q = text[i];
     if (q === '"' || q === "'" || q === "`") {
       i++;
