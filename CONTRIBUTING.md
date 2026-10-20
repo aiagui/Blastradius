@@ -11,7 +11,7 @@ is in **English**.
 
 - CI must pass: typecheck, lint, tests (including the secret canary and the
   read-only allowlist tests), build, and offline smoke tests of the built CLI
-  on Node 20 and 22. Run `npm run check` and the canary command below before
+  on Node 22 and 24. Run `npm run check` and the canary command below before
   pushing.
 - A pull request needs one approving review before it is merged.
 - Open it as a draft while you are still working on it, and mark it ready for
