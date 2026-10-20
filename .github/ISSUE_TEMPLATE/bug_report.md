@@ -14,6 +14,6 @@ labels: bug
 
 **Environment**
 
-- blastradius version (`npx blastradius --version`):
+- blastradius version (`npx @aiagui/blastradius --version`):
 - Node version (`node --version`):
 - OS:
