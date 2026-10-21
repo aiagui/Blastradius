@@ -9,6 +9,7 @@ import { guardOutput } from "./report/guard.js";
 import { renderJson } from "./report/json.js";
 import { renderTerminal } from "./report/terminal.js";
 import { scan, type ScanOptions } from "./scan.js";
+import { redactSecrets } from "./redact.js";
 import { VERSION } from "./version.js";
 
 export interface Io {
@@ -22,12 +23,9 @@ export interface Io {
 export const EXIT = { ok: 0, threshold: 1, usage: 2, internal: 70 } as const;
 
 
-/** Token-shaped substrings that must never appear in CLI error text. */
-const SECRETISH = /(?:gh[pousr]_|github_pat_|[srp]k_(?:live|test)_|whsec_|vc[piar]_)[A-Za-z0-9_\-/+]{8,}|\b[0-9a-f]{40}\b/gi;
-
 function redactArgError(err: unknown): string {
   if (!(err instanceof Error)) return "invalid arguments";
-  return err.message.replace(SECRETISH, "[REDACTED]");
+  return redactSecrets(err.message);
 }
 
 function skipReasonText(reason: string): string {
@@ -92,8 +90,9 @@ export async function main(argv: readonly string[], io: Io): Promise<number> {
   const owned = nodeOwnedFlag(argv);
   if (owned !== undefined) {
     io.stderr(
-      `blastradius: ${owned} is a Node.js option, not a blastradius option. Node reads that file before blastradius starts.\n` +
-        "Use -f/--file <name> to pick which file in --dir to scan.\n",
+      `blastradius: ${owned} is a Node.js option, not a blastradius option.\n` +
+        "Use -f/--file <name> to pick which file in --dir to scan.\n" +
+        "Note: if you run node dist/cli.js (or pass this flag to npx without --), Node may still load that file before blastradius starts.\n",
     );
     return EXIT.usage;
   }

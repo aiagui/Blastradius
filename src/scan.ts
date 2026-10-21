@@ -5,6 +5,7 @@ import { createSafeFetch, SafeFetchError } from "./net/safeFetch.js";
 import { rollUp, sortResults, summarize, type SecretResult } from "./risk/aggregate.js";
 import type { Report } from "./report/model.js";
 import type { Secret } from "./secret.js";
+import { redactSecrets } from "./redact.js";
 import { VERSION } from "./version.js";
 
 export interface ScanOptions {
@@ -83,8 +84,8 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
     tool: "blastradius",
     version: VERSION,
     generatedAt: (opts.now?.() ?? new Date()).toISOString(),
-    directory: opts.dir,
-    files,
+    directory: redactSecrets(opts.dir),
+    files: files.map((f) => redactSecrets(f)),
     offline: opts.offline,
     summary: summarize(sorted),
     results: sorted,

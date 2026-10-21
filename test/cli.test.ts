@@ -42,6 +42,25 @@ describe("cli", () => {
     expect(r.err).not.toContain("ghp_Z");
   });
 
+  it("redacts unprefixed 24-char tokens from argument errors", async () => {
+    const token = "a".repeat(24);
+    const r = await cli([token]);
+    expect(r.code).toBe(EXIT.usage);
+    expect(r.err).toContain("[REDACTED]");
+    expect(r.err).not.toContain(token);
+  });
+
+  it("redacts token-shaped --dir and --file values in the report", async () => {
+    const token = `ghp_${"Q".repeat(36)}`;
+    const r = await cli(["--dir", token, "--offline", "--json"]);
+    expect(r.out).not.toContain(token);
+    expect(r.out).toContain("[REDACTED]");
+    const vercel = "b".repeat(24);
+    const r2 = await cli(["--file", vercel, "--offline", "--json"]);
+    // missing file: still must not echo the name if token-shaped
+    expect(r2.out).not.toContain(vercel);
+  });
+
 
   it.each([
     ["--env-file", ".env"],
