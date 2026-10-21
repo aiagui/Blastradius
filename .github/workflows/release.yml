@@ -22,6 +22,7 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: write
+      checks: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -42,6 +43,30 @@ jobs:
             echo "::error::Tag $TAG does not match package.json version $version."
             exit 1
           fi
+      - name: Require green CI on the tagged commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Require every GitHub Actions check-run on this commit to have succeeded.
+          mapfile -t lines < <(gh api --paginate             "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/check-runs"             --jq '.check_runs[] | select(.app.slug=="github-actions") | "\(.name)\t\(.status)\t\(.conclusion)"')
+          if [ "${#lines[@]}" -eq 0 ]; then
+            echo "::error::No GitHub Actions check runs found for this commit."
+            exit 1
+          fi
+          bad=0
+          for line in "${lines[@]}"; do
+            IFS=$'\t' read -r name status conclusion <<<"$line"
+            echo "$name: $status/$conclusion"
+            if [ "$status" != "completed" ]; then
+              echo "::error::$name is still $status"
+              bad=1
+            elif [ "$conclusion" != "success" ] && [ "$conclusion" != "skipped" ] && [ "$conclusion" != "neutral" ]; then
+              echo "::error::$name concluded $conclusion"
+              bad=1
+            fi
+          done
+          [ "$bad" -eq 0 ]
       - name: Create the release from the CHANGELOG entry
         env:
           GH_TOKEN: ${{ github.token }}

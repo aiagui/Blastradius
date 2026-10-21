@@ -36,8 +36,9 @@ with one required approving review.
 
 The package is private and is **not** published to npm. Releases are GitHub
 tags and GitHub Releases only. Install by cloning a tag, then
-`npm ci && npm install -g .` (or `node dist/cli.js`). Direct
-`npm install -g github:…` is not supported while `dist/` is not committed.
+`npm ci && npm install -g .` (or `node dist/cli.js`). Global install from a
+git URL (`npm install -g github:…`) fails prepare today; a project-local
+`npm install github:…` works. `npm install -g .` symlinks to the clone.
 
 1. In a pull request, set `version` in `package.json` and `src/version.ts`, run
    `npm install` to update the lockfile, and move the `Unreleased` entries to a

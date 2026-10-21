@@ -9,10 +9,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
  * Marker regression: the installed bin must not let Node load a scanned
  * .env (or config file) before blastradius starts.
  *
- * Packs the local build and installs the tarball with npm into a temp
- * prefix (same layout as `npm install -g .` after a clone). Nothing is
- * fetched from the npm registry. NODE_OPTIONS is left alone in the child
- * environment.
+ * Packs the already-built dist/ with `npm pack --ignore-scripts` and installs
+ * the tarball into a temp prefix (a copy, not a symlink to the clone).
+ * NODE_OPTIONS is left alone in the child environment.
  */
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
@@ -27,7 +26,7 @@ beforeAll(() => {
   if (!existsSync(CLI_SRC)) throw new Error("dist/cli.js missing: run npm run build first");
 
   const packDir = mkdtempSync(join(tmpdir(), "br-pack-"));
-  const pack = spawnSync("npm", ["pack", "--pack-destination", packDir], {
+  const pack = spawnSync("npm", ["pack", "--ignore-scripts", "--pack-destination", packDir], {
     cwd: ROOT,
     encoding: "utf8",
     env: process.env,
@@ -48,6 +47,9 @@ beforeAll(() => {
   }
   bin = join(prefix, "bin", "blastradius");
   if (!existsSync(bin)) throw new Error(`installed bin missing at ${bin}`);
+  // Sanity: the bin must start at all (BusyBox would fail here with 127).
+  const ver = spawnSync(bin, ["--version"], { encoding: "utf8", env: process.env });
+  if (ver.status !== 0) throw new Error(`installed bin --version failed: ${ver.stderr}`);
 
   project = mkdtempSync(join(tmpdir(), "br-project-"));
   marker = join(project, "MARKER");
@@ -65,10 +67,10 @@ afterAll(() => {
   rmSync(project, { recursive: true, force: true });
 });
 
-function run(args: string[]): { code: number | null; markers: number } {
+function run(args: string[]): { code: number | null; markers: number; err: string } {
   rmSync(marker, { force: true });
   const r = spawnSync(bin, args, { cwd: project, encoding: "utf8", env: process.env });
-  return { code: r.status, markers: existsSync(marker) ? 1 : 0 };
+  return { code: r.status, markers: existsSync(marker) ? 1 : 0, err: r.stderr };
 }
 
 describe("installed package (packed install): Node must not preload scanned files", () => {
@@ -78,27 +80,29 @@ describe("installed package (packed install): Node must not preload scanned file
     expect(r.markers).toBe(0);
   });
 
-  it("--env-file is rejected and does not run a NODE_OPTIONS payload", () => {
-    const r = run(["--env-file", ".env"]);
+  it.each([
+    ["--env-file", ".env"],
+    ["--env-file=.env"],
+    ["--env-file-if-exists", ".env"],
+    ["--env-file-if-exists=.env"],
+  ])("%s is rejected and does not run a NODE_OPTIONS payload", (...args: string[]) => {
+    const r = run(args);
     expect(r.code).toBe(2);
     expect(r.markers).toBe(0);
+    expect(r.err).toContain("is a Node.js option");
   });
 
-  it("--env-file= is rejected and does not run a NODE_OPTIONS payload", () => {
-    const r = run(["--env-file=.env"]);
-    expect(r.code).toBe(2);
-    expect(r.markers).toBe(0);
-  });
-
-  it.fails("--experimental-config-file= does not run a config payload (known Node limitation)", () => {
+  // Known Node limitation: config-file flags still load after `--`.
+  // Assert the actual observed behaviour so a dead bin (exit 127) fails the test.
+  it("--experimental-config-file= still runs a config payload (known Node limitation)", () => {
     const r = run(["--experimental-config-file=evil.config.json"]);
     expect(r.code).toBe(2);
-    expect(r.markers).toBe(0);
+    expect(r.markers).toBe(1);
   });
 
-  it.fails("--experimental-default-config-file does not run a config payload (known Node limitation)", () => {
+  it("--experimental-default-config-file still runs a config payload (known Node limitation)", () => {
     const r = run(["--experimental-default-config-file"]);
     expect(r.code).toBe(2);
-    expect(r.markers).toBe(0);
+    expect(r.markers).toBe(1);
   });
 });

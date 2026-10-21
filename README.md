@@ -52,7 +52,9 @@ Or run the built file without a global install:
 node dist/cli.js --dir ~/code/your-project
 ```
 
-`npm install -g github:aiagui/Blastradius#v0.2.1` is **not** supported today: `dist/` is not committed, and npm's git-install prepare step does not install this package's devDependencies before `prepare` runs, so the TypeScript build fails. Use the clone path above.
+`npm install -g github:aiagui/Blastradius#v0.2.1` (global install from a git URL) **fails today**: the nested prepare build cannot see TypeScript. A **project-local** `npm install github:aiagui/Blastradius#v0.2.1` and `npx github:aiagui/Blastradius …` do work. Prefer the clone path above. If you use npx, pass `--` before blastradius flags (`npx -- github:aiagui/Blastradius -f .env`), so Node does not treat `--env-file` as its own option.
+
+`npm install -g .` after a clone **symlinks** the global install to that clone (it is not a copy). Moving or deleting the clone breaks the command; a `git pull` without rebuilding leaves a stale `dist/`.
 
 Want to try it without touching the network first? Add `--offline`.
 
