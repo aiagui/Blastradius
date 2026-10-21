@@ -35,30 +35,28 @@ v0.1 checks **GitHub**, **Vercel** and **Stripe** credentials.
 
 ## Quick start
 
-Needs Node 22.13 or newer. This package is **not** published to npm; install it from GitHub.
-
-```sh
-# Global install from a tag (builds dist/ via the prepare script)
-npm install -g github:aiagui/Blastradius#v0.2.1
-blastradius --dir ~/code/your-project
-```
-
-Or clone and run from source:
+Needs Node 22.13 or newer. This package is **not** published to npm; install it from this repository.
 
 ```sh
 git clone https://github.com/aiagui/Blastradius.git
 cd Blastradius
 git checkout v0.2.1   # or main
-npm ci && npm run build
-# either:
-npm link                          # puts blastradius on your PATH
-# or:
+npm ci                # runs prepare and builds dist/
+npm install -g .      # puts blastradius on your PATH
+blastradius --dir ~/code/your-project
+```
+
+Or run the built file without a global install:
+
+```sh
 node dist/cli.js --dir ~/code/your-project
 ```
 
+`npm install -g github:aiagui/Blastradius#v0.2.1` is **not** supported today: `dist/` is not committed, and npm's git-install prepare step does not install this package's devDependencies before `prepare` runs, so the TypeScript build fails. Use the clone path above.
+
 Want to try it without touching the network first? Add `--offline`.
 
-The installed bin starts with `#!/usr/bin/env -S node --`. That needs an `env` that supports `-S` (GNU coreutils ≥ 8.30, FreeBSD/macOS). On Alpine install `coreutils-env`; BusyBox `env` has no `-S` and the bin will not start. Prefer the installed bin or `npm exec --` over calling `node dist/cli.js` with flags Node also reads (`--env-file*`, `--experimental-*config-file`).
+The installed bin starts with `#!/usr/bin/env -S node --`. That needs an `env` that supports `-S` (GNU coreutils ≥ 8.30, FreeBSD/macOS). On Alpine install `coreutils-env`; BusyBox `env` has no `-S` and the bin will not start. Prefer the installed bin over calling `node dist/cli.js` with flags Node also reads (`--env-file*`, `--experimental-*config-file`).
 
 ## Reading the report
 

@@ -9,13 +9,14 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
  * Marker regression: the installed bin must not let Node load a scanned
  * .env (or config file) before blastradius starts.
  *
- * Installs this worktree through git+file:// (the GitHub install path), so
- * npm runs the prepare script and builds dist/. Nothing is fetched from the
- * npm registry. NODE_OPTIONS is intentionally left alone in the child
+ * Packs the local build and installs the tarball with npm into a temp
+ * prefix (same layout as `npm install -g .` after a clone). Nothing is
+ * fetched from the npm registry. NODE_OPTIONS is left alone in the child
  * environment.
  */
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
+const CLI_SRC = join(ROOT, "dist", "cli.js");
 
 let prefix: string;
 let bin: string;
@@ -23,14 +24,22 @@ let project: string;
 let marker: string;
 
 beforeAll(() => {
-  const head = spawnSync("git", ["rev-parse", "HEAD"], { cwd: ROOT, encoding: "utf8" });
-  if (head.status !== 0) throw new Error(`git rev-parse failed: ${head.stderr}`);
-  const sha = head.stdout.trim();
+  if (!existsSync(CLI_SRC)) throw new Error("dist/cli.js missing: run npm run build first");
+
+  const packDir = mkdtempSync(join(tmpdir(), "br-pack-"));
+  const pack = spawnSync("npm", ["pack", "--pack-destination", packDir], {
+    cwd: ROOT,
+    encoding: "utf8",
+    env: process.env,
+  });
+  if (pack.status !== 0) throw new Error(`npm pack failed: ${pack.stderr}`);
+  const lines = pack.stdout.trim().split("\n").filter(Boolean);
+  const tgzName = lines[lines.length - 1];
+  if (tgzName === undefined) throw new Error("npm pack produced no tarball name");
+  const tgz = join(packDir, tgzName);
 
   prefix = mkdtempSync(join(tmpdir(), "br-prefix-"));
-  // git+file URL: npm clones the local repo at that commit and runs prepare.
-  const spec = `git+file://${ROOT}#${sha}`;
-  const install = spawnSync("npm", ["install", "-g", "--prefix", prefix, spec], {
+  const install = spawnSync("npm", ["install", "-g", "--prefix", prefix, tgz], {
     encoding: "utf8",
     env: process.env,
   });
@@ -58,12 +67,11 @@ afterAll(() => {
 
 function run(args: string[]): { code: number | null; markers: number } {
   rmSync(marker, { force: true });
-  // Do not strip NODE_OPTIONS from the environment.
   const r = spawnSync(bin, args, { cwd: project, encoding: "utf8", env: process.env });
   return { code: r.status, markers: existsSync(marker) ? 1 : 0 };
 }
 
-describe("installed package (git install): Node must not preload scanned files", () => {
+describe("installed package (packed install): Node must not preload scanned files", () => {
   it("--file does not load NODE_OPTIONS from the scanned .env", () => {
     const r = run(["--file", ".env", "--offline", "--no-color"]);
     expect(r.code).toBe(0);
@@ -82,9 +90,6 @@ describe("installed package (git install): Node must not preload scanned files",
     expect(r.markers).toBe(0);
   });
 
-  // Config-file flags are still parsed by Node after `--` (verified on
-  // Node 22.23.3 and 24.22.0). The shebang cannot stop them. Documented
-  // limitation: never pass these flags. Keep the assertion strict.
   it.fails("--experimental-config-file= does not run a config payload (known Node limitation)", () => {
     const r = run(["--experimental-config-file=evil.config.json"]);
     expect(r.code).toBe(2);

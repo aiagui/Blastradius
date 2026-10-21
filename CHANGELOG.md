@@ -21,10 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- The package is no longer published to npm. Install from GitHub
-  (`npm install -g github:aiagui/Blastradius#v0.2.1`, or clone and build).
-  The release workflow only creates the GitHub release. `package.json` is
-  `"private": true` and a `prepare` script builds `dist/` on git installs.
+- The package is no longer published to npm. Install by cloning a release
+  tag, then `npm ci && npm install -g .` (or `node dist/cli.js`). The release
+  workflow only creates the GitHub release. `package.json` is `"private": true`.
 
 ## [0.2.0] - 2026-10-21
 

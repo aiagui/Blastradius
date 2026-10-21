@@ -35,9 +35,9 @@ with one required approving review.
 ## Releasing
 
 The package is private and is **not** published to npm. Releases are GitHub
-tags and GitHub Releases only. Install with
-`npm install -g github:aiagui/Blastradius#vX.Y.Z` (the `prepare` script builds
-`dist/`) or clone and run `npm ci && npm run build`.
+tags and GitHub Releases only. Install by cloning a tag, then
+`npm ci && npm install -g .` (or `node dist/cli.js`). Direct
+`npm install -g github:…` is not supported while `dist/` is not committed.
 
 1. In a pull request, set `version` in `package.json` and `src/version.ts`, run
    `npm install` to update the lockfile, and move the `Unreleased` entries to a
