@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.2.1] - TBD
+## [0.2.1] - 2026-10-21
 
 ### Security
 
@@ -55,6 +55,7 @@ First release, published to npm as `@aiagui/blastradius` (the command is `blastr
 
 - The example template connector is never registered in the CLI, so it cannot report fake findings in real scans.
 
-[Unreleased]: https://github.com/aiagui/Blastradius/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/aiagui/Blastradius/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/aiagui/Blastradius/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/aiagui/Blastradius/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/aiagui/Blastradius/releases/tag/v0.1.0
