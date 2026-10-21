@@ -43,8 +43,11 @@ git URL (`npm install -g github:…`) fails prepare today; a project-local
 1. In a pull request, set `version` in `package.json` and `src/version.ts`, run
    `npm install` to update the lockfile, and move the `Unreleased` entries to a
    new `## [x.y.z] - YYYY-MM-DD` section in the changelog.
-2. After it is merged, tag the merge commit and push the tag:
-   `git tag vX.Y.Z && git push origin vX.Y.Z`.
+2. After it is merged, wait until the `CI` run for that merge commit on `main`
+   is green, then tag the merge commit and push the tag:
+   `git tag vX.Y.Z && git push origin vX.Y.Z`. The release workflow fails
+   closed while CI is still running or has failed. If you pushed the tag too
+   early, re-run the failed release workflow once CI is green.
 3. The release workflow checks that the tag is on `main`, matches
    `package.json`, and that both `CI` jobs (`typecheck, lint, test, build
    (Node 22)` and `(Node 24)`) succeeded on the tagged commit. If you rename
