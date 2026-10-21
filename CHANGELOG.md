@@ -27,6 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The release workflow creates the release only if both CI jobs
   (`typecheck, lint, test, build (Node 22)` and `(Node 24)`) succeeded on the
   tagged commit. Other check runs, including the release job's own, are ignored.
+- Names that are 24 characters long, such as `PaymentReconciliationApp` or a
+  MongoDB ObjectId, are no longer masked in messages or in the JSON report.
 
 ## [0.2.0] - 2026-10-21
 

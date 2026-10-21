@@ -23,8 +23,15 @@ export interface Io {
 export const EXIT = { ok: 0, threshold: 1, usage: 2, internal: 70 } as const;
 
 
-function redactArgError(err: unknown): string {
+function redactArgError(err: unknown, argv: readonly string[]): string {
   if (!(err instanceof Error)) return "invalid arguments";
+  // parseArgs splits a short-option group (-v<token>) and names the first
+  // unknown character, which would echo one character of the token. If the
+  // option it names is not an argument the user typed, do not repeat it.
+  const unknown = /Unknown option '([^']*)'/.exec(err.message)?.[1];
+  if (unknown !== undefined && !argv.some((a) => a === unknown || a.startsWith(`${unknown}=`))) {
+    return "Unknown option in a combined short-option group. Pass each option separately.";
+  }
   return redactSecrets(err.message);
 }
 
@@ -116,7 +123,7 @@ export async function main(argv: readonly string[], io: Io): Promise<number> {
   } catch (err: unknown) {
     // parseArgs echoes the offending argument. A token passed by mistake
     // (blastradius $GITHUB_TOKEN) must not appear on stderr.
-    io.stderr(`blastradius: ${redactArgError(err)}\n\n${HELP}`);
+    io.stderr(`blastradius: ${redactArgError(err, argv)}\n\n${HELP}`);
     return EXIT.usage;
   }
   const v = parsed.values;
@@ -155,7 +162,7 @@ export async function main(argv: readonly string[], io: Io): Promise<number> {
   }
 
   for (const skip of result.skipped) {
-    io.stderr(`blastradius: skipped ${skip.name}: ${skipReasonText(skip.reason)}\n`);
+    io.stderr(`blastradius: skipped ${redactSecrets(skip.name)}: ${skipReasonText(skip.reason)}\n`);
   }
 
   const color = !v["no-color"] && io.isTTY && io.env["NO_COLOR"] === undefined;
