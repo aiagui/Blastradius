@@ -89,6 +89,13 @@ describe("cli", () => {
     expect((JSON.parse(r2.out) as { directory: string }).directory).toBe(oid);
   });
 
+  it("redacts a random-looking 24-char token with no digits", () => {
+    const noDigits = "qWeRtYuIoPaSdFgHjKlZxCvB"; // Not a real token.
+    expect(noDigits).toHaveLength(24);
+    expect(redactSecrets(`-d ${noDigits}`)).toBe("-d [REDACTED]");
+    expect(redactSecrets("Q3PlanningDocsFinalDraft")).toBe("Q3PlanningDocsFinalDraft");
+  });
+
   it("redacts a random 24-char token after an underscore", () => {
     expect(redactSecrets(`x_${RANDOM24}`)).toBe("x_[REDACTED]");
     expect(redactSecrets(`dir/x_${RANDOM24}/y`)).not.toContain(RANDOM24);
