@@ -178,7 +178,7 @@ because a valid key behind an IP or network policy can still move money.
 
 Exit codes: `0` ok, `1` `--fail-on` threshold reached, `2` usage error, `70` internal error.
 
-Use `-f`/`--file` to pick files. Don't pass `--env-file` or `--env-file-if-exists`: those are Node.js options, so Node reads that file itself before blastradius starts. blastradius exits with code 2 if it sees them.
+Use `-f`/`--file` to pick files. Don't pass `--env-file`, `--env-file-if-exists`, `--experimental-config-file` or `--experimental-default-config-file`: those are Node.js options, so Node reads that file itself before blastradius starts. blastradius exits with code 2 if it sees them.
 
 </details>
 

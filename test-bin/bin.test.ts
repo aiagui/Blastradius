@@ -25,6 +25,10 @@ beforeAll(() => {
   mkdirSync(project);
   writeFileSync(join(project, ".env"), "APP_NAME=demo\n");
   writeFileSync(join(project, ".env.production"), "APP_NAME=demo\n");
+  // Empty Node.js config files, so Node starts normally and blastradius
+  // gets to see the flags.
+  writeFileSync(join(project, "node.config.json"), "{}\n");
+  writeFileSync(join(project, "other.config.json"), "{}\n");
 });
 
 afterAll(() => {
@@ -69,6 +73,27 @@ describe("installed bin", () => {
     expect(r.code).toBe(2);
     expect(r.err).toContain("is a Node.js option");
     expect(r.err).toContain("--file");
+    expect(r.out).toBe("");
+  });
+
+  it.each([
+    ["--experimental-config-file", "other.config.json"],
+    ["--experimental-config-file=other.config.json"],
+    ["--experimental-default-config-file"],
+  ])("rejects Node's config file flag: %s", (...args: string[]) => {
+    const r = run([...args, "--offline"], project);
+    expect(r.code).toBe(2);
+    expect(r.err).toContain("is a Node.js option");
+    expect(r.err).toContain("--file");
+    expect(r.out).toBe("");
+  });
+
+  it("never scans with --experimental-default-config-file=<value>", () => {
+    // Node 24 refuses this form itself (exit 9) before blastradius starts;
+    // Node 22 lets it through and blastradius rejects it.
+    const r = run(["--experimental-default-config-file=other.config.json", "--offline"], project);
+    expect([2, 9]).toContain(r.code);
+    if (r.code === 2) expect(r.err).toContain("is a Node.js option");
     expect(r.out).toBe("");
   });
 });

@@ -41,11 +41,17 @@ Secrets are never printed, logged or sent anywhere except the API that issued th
 
 /**
  * Node itself treats these as its own options even after the script name
- * (nodejs/node#54232) and reads the file before this code runs, so the only
+ * (nodejs/node#54232) and reads the file (an env file or a config file)
+ * before this code runs, so the only
  * real protection is that blastradius never asks for them. Rejecting them
  * here makes sure nobody relies on them by accident.
  */
-const NODE_OWNED_FLAGS = ["--env-file", "--env-file-if-exists"] as const;
+const NODE_OWNED_FLAGS = [
+  "--env-file",
+  "--env-file-if-exists",
+  "--experimental-config-file",
+  "--experimental-default-config-file",
+] as const;
 
 function nodeOwnedFlag(argv: readonly string[]): string | undefined {
   for (const arg of argv) {

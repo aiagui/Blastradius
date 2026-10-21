@@ -39,6 +39,11 @@ describe("cli", () => {
     ["--env-file-if-exists", ".env"],
     ["--env-file-if-exists=.env"],
     ["--offline", "--env-file", ".env"],
+    ["--experimental-config-file", "node.config.json"],
+    ["--experimental-config-file=node.config.json"],
+    ["--experimental-default-config-file"],
+    ["--experimental-default-config-file=node.config.json"],
+    ["--offline", "--experimental-config-file", "node.config.json"],
   ])("rejects Node's own file flags: %s", async (...args: string[]) => {
     const r = await cli(args);
     expect(r.code).toBe(EXIT.usage);
