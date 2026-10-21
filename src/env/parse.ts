@@ -167,7 +167,8 @@ function errorCode(err: unknown): string {
 const HAS_NOFOLLOW = typeof constants.O_NOFOLLOW === "number" && constants.O_NOFOLLOW !== 0;
 
 /**
- * Reads one env file under `dir` after rejecting unsafe targets.
+ * Reads one env file under `dirReal` (the already resolved --dir) after
+ * rejecting unsafe targets.
  *
  * Opens the path once with O_RDONLY|O_NOFOLLOW|O_NONBLOCK, fstats the fd,
  * requires a regular file within the size cap, checks that the opened file
@@ -189,16 +190,13 @@ const HAS_NOFOLLOW = typeof constants.O_NOFOLLOW === "number" && constants.O_NOF
  * only narrowed on every platform. Hardlinks are read by design.
  */
 export async function readEnvFile(
-  dir: string,
+  dirReal: string,
   name: string,
 ): Promise<{ content: string } | { skip: EnvSkipReason }> {
-  const path = join(dir, name);
-  let dirReal: string;
-  try {
-    dirReal = await realpath(dir);
-  } catch {
-    return { skip: "unreadable" };
-  }
+  // dirReal is realpath(--dir), computed once by the caller before any file is
+  // opened. Open by that resolved path so every file is checked against the
+  // same root, even if a parent of --dir is swapped during the scan.
+  const path = join(dirReal, name);
 
   if (!HAS_NOFOLLOW) {
     return readEnvFileFallback(dirReal, path);
@@ -266,10 +264,18 @@ async function readFromOpenPath(
     }
     if (!isPathInside(dirReal, openedReal)) return { skip: "symlink_outside" };
 
-    const buf = Buffer.allocUnsafe(MAX_ENV_FILE_BYTES + 1);
-    const { bytesRead } = await fh.read(buf, 0, MAX_ENV_FILE_BYTES + 1, 0);
-    if (bytesRead > MAX_ENV_FILE_BYTES) return { skip: "too_large" };
-    return { content: buf.subarray(0, bytesRead).toString("utf8") };
+    // Read until EOF or MAX+1 bytes. One read() may return fewer bytes than
+    // asked (network filesystems), so loop instead of trusting a single call.
+    const cap = MAX_ENV_FILE_BYTES + 1;
+    const buf = Buffer.allocUnsafe(cap);
+    let total = 0;
+    while (total < cap) {
+      const { bytesRead } = await fh.read(buf, total, cap - total, total);
+      if (bytesRead === 0) break;
+      total += bytesRead;
+    }
+    if (total > MAX_ENV_FILE_BYTES) return { skip: "too_large" };
+    return { content: buf.subarray(0, total).toString("utf8") };
   } finally {
     await fh.close().catch(() => undefined);
   }
@@ -304,8 +310,14 @@ export async function loadEnvDir(
   const list = files ?? (await findEnvFiles(dir));
   const entries: EnvEntry[] = [];
   const skipped: EnvSkip[] = [];
-  // Resolve once so symlink checks are against the real scan root.
-  const root = resolve(dir);
+  // Resolve --dir once, at the start, so every containment check uses the
+  // same root. A symlinked --dir is followed here by design.
+  let root: string;
+  try {
+    root = await realpath(resolve(dir));
+  } catch {
+    return { entries, skipped };
+  }
   for (const name of list) {
     const result = await readEnvFile(root, name);
     if ("skip" in result) {
