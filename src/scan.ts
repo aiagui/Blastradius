@@ -5,6 +5,7 @@ import { createSafeFetch, SafeFetchError } from "./net/safeFetch.js";
 import { rollUp, sortResults, summarize, type SecretResult } from "./risk/aggregate.js";
 import type { Report } from "./report/model.js";
 import type { Secret } from "./secret.js";
+import { redactSecrets } from "./redact.js";
 import { VERSION } from "./version.js";
 
 export interface ScanOptions {
@@ -20,6 +21,8 @@ export interface ScanResult {
   readonly report: Report;
   /** Every secret value seen, for the output leak guard. Never serialized. */
   readonly secrets: readonly Secret[];
+  /** .env files that were found but not read (symlink, size, type). */
+  readonly skipped: readonly { readonly name: string; readonly reason: string }[];
 }
 
 function failureFinding(err: unknown): Finding {
@@ -43,7 +46,7 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
   }
 
   const files = opts.files ?? (await findEnvFiles(opts.dir));
-  const env = await loadEnvDir(opts.dir, files);
+  const { entries: env, skipped } = await loadEnvDir(opts.dir, files);
   const results: SecretResult[] = [];
   const allSecrets: Secret[] = [];
 
@@ -81,11 +84,11 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
     tool: "blastradius",
     version: VERSION,
     generatedAt: (opts.now?.() ?? new Date()).toISOString(),
-    directory: opts.dir,
-    files,
+    directory: redactSecrets(opts.dir),
+    files: files.map((f) => redactSecrets(f)),
     offline: opts.offline,
     summary: summarize(sorted),
     results: sorted,
   };
-  return { report, secrets: allSecrets };
+  return { report, secrets: allSecrets, skipped };
 }

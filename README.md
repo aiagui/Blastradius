@@ -35,30 +35,30 @@ v0.1 checks **GitHub**, **Vercel** and **Stripe** credentials.
 
 ## Quick start
 
-Needs Node 22.13 or newer. Run it in your project without installing anything:
-
-```sh
-cd your-project
-npx @aiagui/blastradius
-```
-
-Or install it globally (the command is still `blastradius`):
-
-```sh
-npm install -g @aiagui/blastradius
-blastradius --dir ~/code/your-project
-```
-
-Want to try it without touching the network first? Add `--offline`.
-
-### From source
+Needs Node 22.13 or newer. This package is **not** published to npm; install it from this repository.
 
 ```sh
 git clone https://github.com/aiagui/Blastradius.git
 cd Blastradius
-npm ci && npm run build
+git checkout v0.2.1   # or main
+npm ci                # runs prepare and builds dist/
+npm install -g .      # puts blastradius on your PATH
+blastradius --dir ~/code/your-project
+```
+
+Or run the built file without a global install:
+
+```sh
 node dist/cli.js --dir ~/code/your-project
 ```
+
+`npm install -g github:aiagui/Blastradius#v0.2.1` (global install from a git URL) **fails today**: the nested prepare build cannot see TypeScript. A **project-local** `npm install github:aiagui/Blastradius#v0.2.1` and `npx github:aiagui/Blastradius …` do work. Prefer the clone path above. If you use npx, pass `--` before blastradius flags (`npx -- github:aiagui/Blastradius -f .env`), so Node does not treat `--env-file` as its own option.
+
+`npm install -g .` after a clone **symlinks** the global install to that clone (it is not a copy). Moving or deleting the clone breaks the command; a `git pull` without rebuilding leaves a stale `dist/`.
+
+Want to try it without touching the network first? Add `--offline`.
+
+The installed bin starts with `#!/usr/bin/env -S node --`. That needs an `env` that supports `-S` (GNU coreutils ≥ 8.30, FreeBSD/macOS). On Alpine install `coreutils-env`; BusyBox `env` has no `-S` and the bin will not start. Prefer the installed bin over calling `node dist/cli.js` with flags Node also reads (`--env-file*`, `--experimental-*config-file`).
 
 ## Reading the report
 
@@ -178,7 +178,9 @@ because a valid key behind an IP or network policy can still move money.
 
 Exit codes: `0` ok, `1` `--fail-on` threshold reached, `2` usage error, `70` internal error.
 
-Use `-f`/`--file` to pick files. Don't pass `--env-file`, `--env-file-if-exists`, `--experimental-config-file` or `--experimental-default-config-file`: those are Node.js options, so Node reads that file itself before blastradius starts. blastradius exits with code 2 if it sees them.
+Use `-f`/`--file` to pick files. Don't pass `--env-file`, `--env-file-if-exists`, `--experimental-config-file` or `--experimental-default-config-file`: those are Node.js options, so Node reads that file itself before blastradius starts. blastradius exits with code 2 if it sees them. See [Quick start](#quick-start) for shebang and install notes.
+
+`.env` files that are not regular files, larger than 1 MiB, or symlinks resolving outside `--dir` are skipped with a note on stderr. On Linux this check is race-free; on macOS and Windows it resolves paths by name, so a process that can write to the scanned directory during a scan can only be narrowed, not fully excluded.
 
 </details>
 

@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-21
+
+### Security
+
+- The installed bin now starts Node with `--` (`#!/usr/bin/env -S node --`), so `--env-file*` passed to the bin no longer reaches Node's own option parser. Calling `node path/to/cli.js --env-file …` yourself still lets Node read the file. `--experimental-*config-file` is still loaded by Node even after `--`; never pass those flags. Needs `env -S` (GNU coreutils ≥ 8.30, FreeBSD/macOS). On Alpine install `coreutils-env`; BusyBox `env` has no `-S`.
+- Argument parse errors redact token-shaped substrings before printing to stderr.
+- `.env` files that are not regular files, that are larger than 1 MiB, or whose symlink target resolves outside `--dir` are skipped (with a stderr note). `--dir` is resolved once, before any file is opened, and every file is checked against that root. The file is opened once with `O_NOFOLLOW|O_NONBLOCK` and read through that fd. On Linux the inside-`--dir` check uses `/proc/self/fd`, which closes the symlink/FIFO swap race. On macOS and Windows the check resolves by name, so the race is narrowed, not closed (Windows has no `O_NOFOLLOW` and resolves before opening). Files are read in a loop until end of file or the size cap, so a short read can no longer truncate a file.
+
+### Added
+
+- Detects GitHub App refresh tokens (`ghr_`) and Stripe webhook signing secrets (`whsec_`). Both are reported offline; refresh tokens are never sent to the API.
+
+### Changed
+
+- The package is no longer published to npm. Install by cloning a release
+  tag, then `npm ci && npm install -g .` (or `node dist/cli.js`). The release
+  workflow only creates the GitHub release. `package.json` is `"private": true`.
+- The release workflow creates the release only if both CI jobs
+  (`typecheck, lint, test, build (Node 22)` and `(Node 24)`) succeeded on the
+  tagged commit. Other check runs, including the release job's own, are ignored.
+- Names that are 24 characters long, such as `PaymentReconciliationApp` or a
+  MongoDB ObjectId, are no longer masked in messages or in the JSON report.
+
 ## [0.2.0] - 2026-10-21
 
 ### Security
@@ -43,6 +66,7 @@ First release, published to npm as `@aiagui/blastradius` (the command is `blastr
 
 - The example template connector is never registered in the CLI, so it cannot report fake findings in real scans.
 
-[Unreleased]: https://github.com/aiagui/Blastradius/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/aiagui/Blastradius/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/aiagui/Blastradius/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/aiagui/Blastradius/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/aiagui/Blastradius/releases/tag/v0.1.0

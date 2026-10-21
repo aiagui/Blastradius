@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 // Runs the built CLI as a real process, the way npm installs it on Unix:
-// a symlink to dist/cli.js, started through its `#!/usr/bin/env node` line.
+// a symlink to dist/cli.js, started through its shebang (`#!/usr/bin/env -S node --`).
 // Run with `npm run test:bin` after `npm run build`.
 
 const CLI = fileURLToPath(new URL("../dist/cli.js", import.meta.url));

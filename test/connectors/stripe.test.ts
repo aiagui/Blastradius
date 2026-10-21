@@ -61,12 +61,23 @@ describe("stripe connector: detect", () => {
     ]);
   });
 
-  it("ignores look-alikes and webhook secrets", () => {
+  it("ignores look-alikes", () => {
     const env = parseEnv(
-      `A=sk_live_short\nB=${["sk", "prod", "FAKEFAKEFAKEFAKE"].join("_")}\nC=whsec_FAKEFAKEFAKEFAKE\nD=x${stripeKey("sk", "live", "FAKEFAKEFAKEFAKE")}`,
+      `A=sk_live_short\nB=${["sk", "prod", "FAKEFAKEFAKEFAKE"].join("_")}\nC=whsec_short\nD=x${stripeKey("sk", "live", "FAKEFAKEFAKEFAKE")}`,
       ".env",
     );
     expect(stripe.detect(env)).toHaveLength(0);
+  });
+
+  it("detects webhook signing secrets offline", async () => {
+    const value = `whsec_${"W".repeat(24)}`;
+    const env = parseEnv(`STRIPE_WEBHOOK_SECRET=${value}`, ".env");
+    const found = stripe.detect(env);
+    expect(found).toHaveLength(1);
+    expect(found[0]!.kind).toBe("webhook signing secret");
+    const findings = await stripe.check(found[0]!, { fetch: createSafeFetch(stripe.allowlist), offline: false });
+    expect(findings[0]).toMatchObject({ level: "amber", confidence: "inferred" });
+    expect(findings[0]!.capabilities).toMatchObject({ forge_webhooks: true });
   });
 
   it("binds every key to api.stripe.com only", () => {

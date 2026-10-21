@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env -S node --
 import { realpathSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,6 +9,7 @@ import { guardOutput } from "./report/guard.js";
 import { renderJson } from "./report/json.js";
 import { renderTerminal } from "./report/terminal.js";
 import { scan, type ScanOptions } from "./scan.js";
+import { redactSecrets } from "./redact.js";
 import { VERSION } from "./version.js";
 
 export interface Io {
@@ -20,6 +21,32 @@ export interface Io {
 }
 
 export const EXIT = { ok: 0, threshold: 1, usage: 2, internal: 70 } as const;
+
+
+function redactArgError(err: unknown, argv: readonly string[]): string {
+  if (!(err instanceof Error)) return "invalid arguments";
+  // parseArgs splits a short-option group (-v<token>) and names the first
+  // unknown character, which would echo one character of the token. If the
+  // option it names is not an argument the user typed, do not repeat it.
+  const unknown = /Unknown option '([^']*)'/.exec(err.message)?.[1];
+  if (unknown !== undefined && !argv.some((a) => a === unknown || a.startsWith(`${unknown}=`))) {
+    return "Unknown option in a combined short-option group. Pass each option separately.";
+  }
+  return redactSecrets(err.message);
+}
+
+function skipReasonText(reason: string): string {
+  switch (reason) {
+    case "not_regular":
+      return "not a regular file";
+    case "symlink_outside":
+      return "symlink points outside the scanned directory";
+    case "too_large":
+      return "larger than 1 MiB";
+    default:
+      return "could not be read";
+  }
+}
 
 const HELP = `Usage: blastradius [options]
 
@@ -70,8 +97,9 @@ export async function main(argv: readonly string[], io: Io): Promise<number> {
   const owned = nodeOwnedFlag(argv);
   if (owned !== undefined) {
     io.stderr(
-      `blastradius: ${owned} is a Node.js option, not a blastradius option. Node reads that file before blastradius starts.\n` +
-        "Use -f/--file <name> to pick which file in --dir to scan.\n",
+      `blastradius: ${owned} is a Node.js option, not a blastradius option.\n` +
+        "Use -f/--file <name> to pick which file in --dir to scan.\n" +
+        "Note: if you run node dist/cli.js (or pass this flag to npx without --), Node may still load that file before blastradius starts.\n",
     );
     return EXIT.usage;
   }
@@ -93,7 +121,9 @@ export async function main(argv: readonly string[], io: Io): Promise<number> {
       },
     });
   } catch (err: unknown) {
-    io.stderr(`blastradius: ${err instanceof Error ? err.message : "invalid arguments"}\n\n${HELP}`);
+    // parseArgs echoes the offending argument. A token passed by mistake
+    // (blastradius $GITHUB_TOKEN) must not appear on stderr.
+    io.stderr(`blastradius: ${redactArgError(err, argv)}\n\n${HELP}`);
     return EXIT.usage;
   }
   const v = parsed.values;
@@ -129,6 +159,10 @@ export async function main(argv: readonly string[], io: Io): Promise<number> {
     // Do not print the error: it could contain file contents.
     io.stderr("blastradius: internal error while scanning\n");
     return EXIT.internal;
+  }
+
+  for (const skip of result.skipped) {
+    io.stderr(`blastradius: skipped ${redactSecrets(skip.name)}: ${skipReasonText(skip.reason)}\n`);
   }
 
   const color = !v["no-color"] && io.isTTY && io.env["NO_COLOR"] === undefined;

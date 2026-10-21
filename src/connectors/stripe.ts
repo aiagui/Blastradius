@@ -9,6 +9,8 @@
  *    without writing, so they are always reported as "unknown".
  *  - pk_live_ / pk_test_  publishable keys: meant to be public. Reported green
  *    without any network call.
+ *  - whsec_               webhook signing secrets: offline only. Possession lets
+ *    anyone forge webhooks for the endpoint.
  *
  * A 401 is ambiguous: the key may be revoked, rolled or expired, or the request
  * may be blocked by the key's access policy (IP/ASN/country rules). So a 401 is
@@ -41,6 +43,7 @@ type KeyType = (typeof TYPES)[keyof typeof TYPES];
 type Mode = "live" | "test";
 
 const KEY_PATTERN = /^(sk|rk|pk)_(live|test)_[A-Za-z0-9]{10,}$/;
+const WHSEC_PATTERN = /^whsec_[A-Za-z0-9_]{16,}$/;
 
 interface KeyInfo {
   readonly type: KeyType;
@@ -197,7 +200,7 @@ export const stripe: Connector = {
   },
 
   detect(env) {
-    return detectSecrets(env, {
+    const keys = detectSecrets(env, {
       connector: "stripe",
       valuePattern: KEY_PATTERN,
       allowedHosts: [HOST],
@@ -206,9 +209,27 @@ export const stripe: Connector = {
         return k === undefined ? undefined : kindLabel(k);
       },
     });
+    const webhooks = detectSecrets(env, {
+      connector: "stripe",
+      valuePattern: WHSEC_PATTERN,
+      allowedHosts: [HOST],
+      kind: () => "webhook signing secret",
+    });
+    return [...keys, ...webhooks];
   },
 
   async check(secret: Secret, ctx: CheckContext): Promise<Finding[]> {
+    if (secret.kind === "webhook signing secret") {
+      return [
+        {
+          level: "amber",
+          confidence: "inferred",
+          message: "Webhook signing secret: anyone with this value can forge webhooks for the endpoint.",
+          advice: "Roll this signing secret in your provider dashboard and store the new value in a secrets vault.",
+          capabilities: { read: false, write: false, move_money: false, forge_webhooks: true },
+        },
+      ];
+    }
     // Secret values are only revealed by safeFetch; the kind label carries the key type.
     const k = secret.kind === undefined ? undefined : BY_LABEL.get(secret.kind);
     if (k === undefined) {

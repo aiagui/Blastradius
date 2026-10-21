@@ -7,8 +7,9 @@
  *   KEY=value # comment  multi-line values inside double or single quotes
  * Not supported (on purpose): variable expansion (${OTHER}), command substitution.
  */
-import { readFile, readdir } from "node:fs/promises";
-import { join } from "node:path";
+import { constants } from "node:fs";
+import { open, readdir, readlink, realpath } from "node:fs/promises";
+import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
 export interface EnvEntry {
   readonly key: string;
@@ -128,18 +129,203 @@ export async function findEnvFiles(dir: string): Promise<string[]> {
   return found.sort((a, b) => order(a) - order(b) || a.localeCompare(b));
 }
 
+/** Cap on a single .env file. Larger files are skipped (finding F3). */
+export const MAX_ENV_FILE_BYTES = 1_048_576;
+
+export type EnvSkipReason = "not_regular" | "symlink_outside" | "too_large" | "unreadable";
+
+export interface EnvSkip {
+  readonly name: string;
+  readonly reason: EnvSkipReason;
+}
+
+/**
+ * True when `target` is a path strictly inside `root` (after both are resolved).
+ * Uses a path-segment check so a directory named `..data` is not treated as `..`.
+ */
+export function isPathInside(root: string, target: string): boolean {
+  const rel = relative(root, target);
+  if (rel === "" || isAbsolute(rel)) return false;
+  if (rel === "..") return false;
+  // relative() uses the platform separator; also accept the other one.
+  if (rel.startsWith(`..${sep}`) || rel.startsWith("../") || rel.startsWith("..\\")) return false;
+  return true;
+}
+
+const OPEN_FLAGS =
+  constants.O_RDONLY |
+  (typeof constants.O_NONBLOCK === "number" ? constants.O_NONBLOCK : 0) |
+  (typeof constants.O_NOFOLLOW === "number" ? constants.O_NOFOLLOW : 0);
+
+
+function errorCode(err: unknown): string {
+  if (typeof err !== "object" || err === null || !("code" in err)) return "";
+  const code: unknown = Reflect.get(err, "code");
+  return typeof code === "string" || typeof code === "number" ? String(code) : "";
+}
+
+const HAS_NOFOLLOW = typeof constants.O_NOFOLLOW === "number" && constants.O_NOFOLLOW !== 0;
+
+/**
+ * Reads one env file under `dirReal` (the already resolved --dir) after
+ * rejecting unsafe targets.
+ *
+ * Opens the path once with O_RDONLY|O_NOFOLLOW|O_NONBLOCK, fstats the fd,
+ * requires a regular file within the size cap, checks that the opened file
+ * lies inside `--dir`, then reads at most MAX+1 bytes from that same fd.
+ * O_NOFOLLOW refuses a symlink swapped in as the final path component, and
+ * O_NONBLOCK plus the isFile check stop a swapped-in FIFO from hanging.
+ *
+ * How far the "inside --dir" check holds depends on the platform:
+ * - Linux: the opened path comes from /proc/self/fd, so the check is about
+ *   the fd itself and the symlink/FIFO swap race is closed.
+ * - macOS: Node cannot map an fd to a path (F_GETPATH is not exposed), so
+ *   the check uses realpath by name. The final-component swap is still
+ *   refused by O_NOFOLLOW, but a swap of a directory component between
+ *   open and realpath is only narrowed, not closed.
+ * - Windows: no O_NOFOLLOW; we resolve with realpath, then open the resolved
+ *   path. The race is narrowed, not closed.
+ * Symlinks that stay inside `--dir` are followed by resolving them first and
+ * opening the target with O_NOFOLLOW; that resolve-then-open step is likewise
+ * only narrowed on every platform. Hardlinks are read by design.
+ */
+export async function readEnvFile(
+  dirReal: string,
+  name: string,
+): Promise<{ content: string } | { skip: EnvSkipReason }> {
+  // dirReal is realpath(--dir), computed once by the caller before any file is
+  // opened. Open by that resolved path so every file is checked against the
+  // same root, even if a parent of --dir is swapped during the scan.
+  const path = join(dirReal, name);
+
+  if (!HAS_NOFOLLOW) {
+    return readEnvFileFallback(dirReal, path);
+  }
+
+  try {
+    return await readFromOpenPath(path, dirReal);
+  } catch (err: unknown) {
+    const code = errorCode(err);
+    // ELOOP: path is a symlink and O_NOFOLLOW refused it. Allow only if the
+    // resolved target stays inside --dir, then open that target with O_NOFOLLOW.
+    if (code === "ELOOP" || code === "EMLINK") {
+      let target: string;
+      try {
+        target = await realpath(path);
+      } catch {
+        return { skip: "unreadable" };
+      }
+      if (!isPathInside(dirReal, target)) return { skip: "symlink_outside" };
+      try {
+        return await readFromOpenPath(target, dirReal);
+      } catch {
+        return { skip: "unreadable" };
+      }
+    }
+    if (code === "ENOENT") return { skip: "unreadable" };
+    // EISDIR, ENXIO (fifo on some systems after NONBLOCK), etc.
+    if (code === "EISDIR" || code === "ENXIO" || code === "EAGAIN") return { skip: "not_regular" };
+    return { skip: "unreadable" };
+  }
+}
+
+/**
+ * Path of the file the fd actually refers to. On Linux this asks the kernel
+ * via /proc/self/fd, so it cannot be raced. Elsewhere Node has no fd-to-path
+ * API (macOS F_GETPATH is not exposed), so we fall back to realpath by name,
+ * which only narrows the race.
+ */
+async function openedPath(fd: number, path: string): Promise<string> {
+  if (process.platform === "linux") {
+    try {
+      return await readlink(`/proc/self/fd/${String(fd)}`);
+    } catch {
+      // /proc not mounted: fall through to the by-name check.
+    }
+  }
+  return realpath(path);
+}
+
+async function readFromOpenPath(
+  path: string,
+  dirReal: string,
+): Promise<{ content: string } | { skip: EnvSkipReason }> {
+  const fh = await open(path, OPEN_FLAGS);
+  try {
+    const st = await fh.stat();
+    if (!st.isFile()) return { skip: "not_regular" };
+    if (st.size > MAX_ENV_FILE_BYTES) return { skip: "too_large" };
+
+    let openedReal: string;
+    try {
+      openedReal = await openedPath(fh.fd, path);
+    } catch {
+      return { skip: "unreadable" };
+    }
+    if (!isPathInside(dirReal, openedReal)) return { skip: "symlink_outside" };
+
+    // Read until EOF or MAX+1 bytes. One read() may return fewer bytes than
+    // asked (network filesystems), so loop instead of trusting a single call.
+    const cap = MAX_ENV_FILE_BYTES + 1;
+    const buf = Buffer.allocUnsafe(cap);
+    let total = 0;
+    while (total < cap) {
+      const { bytesRead } = await fh.read(buf, total, cap - total, total);
+      if (bytesRead === 0) break;
+      total += bytesRead;
+    }
+    if (total > MAX_ENV_FILE_BYTES) return { skip: "too_large" };
+    return { content: buf.subarray(0, total).toString("utf8") };
+  } finally {
+    await fh.close().catch(() => undefined);
+  }
+}
+
+/** Windows / platforms without O_NOFOLLOW: realpath then open the resolved path. */
+async function readEnvFileFallback(
+  dirReal: string,
+  path: string,
+): Promise<{ content: string } | { skip: EnvSkipReason }> {
+  let target: string;
+  try {
+    target = await realpath(path);
+  } catch {
+    return { skip: "unreadable" };
+  }
+  if (!isPathInside(dirReal, target)) return { skip: "symlink_outside" };
+  try {
+    return await readFromOpenPath(target, dirReal);
+  } catch (err: unknown) {
+    const code = errorCode(err);
+    if (code === "EISDIR" || code === "ENXIO" || code === "EAGAIN") return { skip: "not_regular" };
+    return { skip: "unreadable" };
+  }
+}
+
 /** Reads and parses every .env* file in `dir`. All entries are kept (connectors dedupe). */
-export async function loadEnvDir(dir: string, files?: readonly string[]): Promise<EnvEntry[]> {
+export async function loadEnvDir(
+  dir: string,
+  files?: readonly string[],
+): Promise<{ entries: EnvEntry[]; skipped: EnvSkip[] }> {
   const list = files ?? (await findEnvFiles(dir));
   const entries: EnvEntry[] = [];
+  const skipped: EnvSkip[] = [];
+  // Resolve --dir once, at the start, so every containment check uses the
+  // same root. A symlinked --dir is followed here by design.
+  let root: string;
+  try {
+    root = await realpath(resolve(dir));
+  } catch {
+    return { entries, skipped };
+  }
   for (const name of list) {
-    let content: string;
-    try {
-      content = await readFile(join(dir, name), "utf8");
-    } catch {
+    const result = await readEnvFile(root, name);
+    if ("skip" in result) {
+      // Missing files stay silent (same as before). Everything else is recorded.
+      if (result.skip !== "unreadable") skipped.push({ name, reason: result.skip });
       continue;
     }
-    entries.push(...parseEnv(content, name));
+    entries.push(...parseEnv(result.content, name));
   }
-  return entries;
+  return { entries, skipped };
 }

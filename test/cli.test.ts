@@ -1,11 +1,16 @@
-import { readFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { EXIT, main } from "../src/cli.js";
+import { redactSecrets } from "../src/redact.js";
 import { meetsThreshold, rollUp, summarize } from "../src/risk/aggregate.js";
 import { VERSION } from "../src/version.js";
 import { fixtureDir, mockFetch } from "./helpers.js";
 
 const BASIC = fixtureDir("basic");
+// Random-looking 24-char value (mixed case and digits, not all hex). Not a real token.
+const RANDOM24 = "aB3dE5fG7hJ9kL1mN2pQ4rS6";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -31,6 +36,88 @@ describe("cli", () => {
     expect((await cli(["--nope"])).code).toBe(EXIT.usage);
     expect((await cli(["--fail-on", "green"])).code).toBe(EXIT.usage);
     expect((await cli(["--file", "../secrets/.env"])).code).toBe(EXIT.usage);
+  });
+
+  it("redacts token-shaped positionals from argument errors", async () => {
+    const token = `ghp_${"Z".repeat(36)}`;
+    const r = await cli([token]);
+    expect(r.code).toBe(EXIT.usage);
+    expect(r.err).toContain("[REDACTED]");
+    expect(r.err).not.toContain(token);
+    expect(r.err).not.toContain("ghp_Z");
+  });
+
+  it("redacts unprefixed 24-char tokens from argument errors", async () => {
+    const token = RANDOM24;
+    const r = await cli([token]);
+    expect(r.code).toBe(EXIT.usage);
+    expect(r.err).toContain("[REDACTED]");
+    expect(r.err).not.toContain(token);
+  });
+
+  it("redacts token-shaped --dir and --file values in the report", async () => {
+    const token = `ghp_${"Q".repeat(36)}`;
+    const r = await cli(["--dir", token, "--offline", "--json"]);
+    expect(r.out).not.toContain(token);
+    expect(r.out).toContain("[REDACTED]");
+    const vercel = RANDOM24;
+    const r2 = await cli(["--file", vercel, "--offline", "--json"]);
+    // missing file: still must not echo the name if token-shaped
+    expect(r2.out).not.toContain(vercel);
+  });
+
+
+  it("does not redact ordinary 24-char names or ObjectIds, in text or JSON", async () => {
+    expect(redactSecrets("-d PaymentReconciliationApp")).toBe("-d PaymentReconciliationApp");
+    expect(redactSecrets("/data/64b7f0c2e4a1b2c3d4e5f607")).toBe("/data/64b7f0c2e4a1b2c3d4e5f607");
+    expect(redactSecrets(".env.PaymentReconciliationApp")).toBe(".env.PaymentReconciliationApp");
+    expect(redactSecrets(`x ${RANDOM24} y`)).toBe("x [REDACTED] y");
+
+    const dir = mkdtempSync(join(tmpdir(), "br-names-"));
+    const app = join(dir, "PaymentReconciliationApp");
+    const oid = join(dir, "64b7f0c2e4a1b2c3d4e5f607");
+    mkdirSync(app);
+    mkdirSync(oid);
+    writeFileSync(join(app, ".env.PaymentReconciliationApp"), "A=1\n");
+    const r = await cli(["--dir", app, "--file", ".env.PaymentReconciliationApp", "--offline", "--json"]);
+    expect(r.code).toBe(EXIT.ok);
+    const report = JSON.parse(r.out) as { directory: string; files: string[] };
+    expect(report.directory).toBe(app);
+    expect(report.files).toEqual([".env.PaymentReconciliationApp"]);
+    expect(r.out).not.toContain("[REDACTED]");
+    const r2 = await cli(["--dir", oid, "--offline", "--json"]);
+    expect((JSON.parse(r2.out) as { directory: string }).directory).toBe(oid);
+  });
+
+  it("redacts a random-looking 24-char token with no digits", () => {
+    const noDigits = "qWeRtYuIoPaSdFgHjKlZxCvB"; // Not a real token.
+    expect(noDigits).toHaveLength(24);
+    expect(redactSecrets(`-d ${noDigits}`)).toBe("-d [REDACTED]");
+    // CamelCase without digits and fewer than six capitals stays readable.
+    expect(redactSecrets("BillingStatementsArchive")).toBe("BillingStatementsArchive");
+  });
+
+  it("redacts a random 24-char token after an underscore", () => {
+    expect(redactSecrets(`x_${RANDOM24}`)).toBe("x_[REDACTED]");
+    expect(redactSecrets(`dir/x_${RANDOM24}/y`)).not.toContain(RANDOM24);
+  });
+
+  it("does not echo any character of -v<token>", async () => {
+    const r = await cli([`-v${RANDOM24}`]);
+    expect(r.code).toBe(EXIT.usage);
+    expect(r.err).not.toContain("'-a'");
+    expect(r.err).not.toContain(RANDOM24.slice(0, 3));
+    expect(r.err).toContain("combined short-option group");
+  });
+
+  it("redacts the file name in the skipped warning", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "br-skip-"));
+    const name = `.env.${RANDOM24}`;
+    mkdirSync(join(dir, name)); // a directory, so it is skipped as not_regular
+    const r = await cli(["--dir", dir, "--file", name, "--offline", "--json"]);
+    expect(r.err).toContain("skipped .env.[REDACTED]: not a regular file");
+    expect(r.err).not.toContain(RANDOM24);
+    expect(r.out).not.toContain(RANDOM24);
   });
 
   it.each([
