@@ -180,6 +180,8 @@ Exit codes: `0` ok, `1` `--fail-on` threshold reached, `2` usage error, `70` int
 
 Use `-f`/`--file` to pick files. Don't pass `--env-file`, `--env-file-if-exists`, `--experimental-config-file` or `--experimental-default-config-file`: those are Node.js options, so Node reads that file itself before blastradius starts. blastradius exits with code 2 if it sees them. See [Quick start](#quick-start) for shebang and install notes.
 
+`.env` files that are not regular files, larger than 1 MiB, or symlinks resolving outside `--dir` are skipped with a note on stderr. On Linux this check is race-free; on macOS and Windows it resolves paths by name, so a process that can write to the scanned directory during a scan can only be narrowed, not fully excluded.
+
 </details>
 
 <details>

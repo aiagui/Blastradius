@@ -8,7 +8,7 @@
  * Not supported (on purpose): variable expansion (${OTHER}), command substitution.
  */
 import { constants } from "node:fs";
-import { open, readdir, realpath } from "node:fs/promises";
+import { open, readdir, readlink, realpath } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
 export interface EnvEntry {
@@ -169,17 +169,24 @@ const HAS_NOFOLLOW = typeof constants.O_NOFOLLOW === "number" && constants.O_NOF
 /**
  * Reads one env file under `dir` after rejecting unsafe targets.
  *
- * On platforms with O_NOFOLLOW (Linux, macOS): open the path once with
- * O_RDONLY|O_NOFOLLOW|O_NONBLOCK, fstat the fd, require a regular file within
- * the size cap, confirm the opened path's realpath stays inside `--dir`, then
- * read at most MAX+1 bytes from the fd. Symlinks to a file inside `--dir` are
- * opened via their realpath (also with O_NOFOLLOW). This closes the TOCTOU
- * window where a racer could swap in a symlink or FIFO between lstat and read.
+ * Opens the path once with O_RDONLY|O_NOFOLLOW|O_NONBLOCK, fstats the fd,
+ * requires a regular file within the size cap, checks that the opened file
+ * lies inside `--dir`, then reads at most MAX+1 bytes from that same fd.
+ * O_NOFOLLOW refuses a symlink swapped in as the final path component, and
+ * O_NONBLOCK plus the isFile check stop a swapped-in FIFO from hanging.
  *
- * Residual: a symlink in a *directory component* of the path can still point
- * the final open outside `--dir` until we check realpath after open; we reject
- * that case. A replace of the file after open with a hardlink is not prevented
- * (same inode). Windows has no O_NOFOLLOW, so we fall back to realpath + open.
+ * How far the "inside --dir" check holds depends on the platform:
+ * - Linux: the opened path comes from /proc/self/fd, so the check is about
+ *   the fd itself and the symlink/FIFO swap race is closed.
+ * - macOS: Node cannot map an fd to a path (F_GETPATH is not exposed), so
+ *   the check uses realpath by name. The final-component swap is still
+ *   refused by O_NOFOLLOW, but a swap of a directory component between
+ *   open and realpath is only narrowed, not closed.
+ * - Windows: no O_NOFOLLOW; we resolve with realpath, then open the resolved
+ *   path. The race is narrowed, not closed.
+ * Symlinks that stay inside `--dir` are followed by resolving them first and
+ * opening the target with O_NOFOLLOW; that resolve-then-open step is likewise
+ * only narrowed on every platform. Hardlinks are read by design.
  */
 export async function readEnvFile(
   dir: string,
@@ -224,6 +231,23 @@ export async function readEnvFile(
   }
 }
 
+/**
+ * Path of the file the fd actually refers to. On Linux this asks the kernel
+ * via /proc/self/fd, so it cannot be raced. Elsewhere Node has no fd-to-path
+ * API (macOS F_GETPATH is not exposed), so we fall back to realpath by name,
+ * which only narrows the race.
+ */
+async function openedPath(fd: number, path: string): Promise<string> {
+  if (process.platform === "linux") {
+    try {
+      return await readlink(`/proc/self/fd/${String(fd)}`);
+    } catch {
+      // /proc not mounted: fall through to the by-name check.
+    }
+  }
+  return realpath(path);
+}
+
 async function readFromOpenPath(
   path: string,
   dirReal: string,
@@ -236,7 +260,7 @@ async function readFromOpenPath(
 
     let openedReal: string;
     try {
-      openedReal = await realpath(path);
+      openedReal = await openedPath(fh.fd, path);
     } catch {
       return { skip: "unreadable" };
     }
