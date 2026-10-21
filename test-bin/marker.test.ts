@@ -7,16 +7,15 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 /**
  * Marker regression: the installed bin must not let Node load a scanned
- * .env (or config file) before blastradius starts. Packs the local build,
- * installs it with npm into a temp prefix, and runs the real symlink.
+ * .env (or config file) before blastradius starts.
  *
- * NODE_OPTIONS is intentionally left alone in the child environment so a
- * leaky ambient value would also fail the test. The payload itself is only
- * in the scanned files.
+ * Installs this worktree through git+file:// (the GitHub install path), so
+ * npm runs the prepare script and builds dist/. Nothing is fetched from the
+ * npm registry. NODE_OPTIONS is intentionally left alone in the child
+ * environment.
  */
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
-const CLI_SRC = join(ROOT, "dist", "cli.js");
 
 let prefix: string;
 let bin: string;
@@ -24,22 +23,20 @@ let project: string;
 let marker: string;
 
 beforeAll(() => {
-  if (!existsSync(CLI_SRC)) throw new Error("dist/cli.js missing: run npm run build first");
-
-  const packDir = mkdtempSync(join(tmpdir(), "br-pack-"));
-  const pack = spawnSync("npm", ["pack", "--pack-destination", packDir], {
-    cwd: ROOT,
-    encoding: "utf8",
-  });
-  if (pack.status !== 0) throw new Error(`npm pack failed: ${pack.stderr}`);
-  const lines = pack.stdout.trim().split("\n").filter(Boolean);
-  const tgzName = lines[lines.length - 1];
-  if (tgzName === undefined) throw new Error("npm pack produced no tarball name");
-  const tgz = join(packDir, tgzName);
+  const head = spawnSync("git", ["rev-parse", "HEAD"], { cwd: ROOT, encoding: "utf8" });
+  if (head.status !== 0) throw new Error(`git rev-parse failed: ${head.stderr}`);
+  const sha = head.stdout.trim();
 
   prefix = mkdtempSync(join(tmpdir(), "br-prefix-"));
-  const install = spawnSync("npm", ["install", "-g", "--prefix", prefix, tgz], { encoding: "utf8" });
-  if (install.status !== 0) throw new Error(`npm install failed: ${install.stderr}\n${install.stdout}`);
+  // git+file URL: npm clones the local repo at that commit and runs prepare.
+  const spec = `git+file://${ROOT}#${sha}`;
+  const install = spawnSync("npm", ["install", "-g", "--prefix", prefix, spec], {
+    encoding: "utf8",
+    env: process.env,
+  });
+  if (install.status !== 0) {
+    throw new Error(`npm install failed: ${install.stderr}\n${install.stdout}`);
+  }
   bin = join(prefix, "bin", "blastradius");
   if (!existsSync(bin)) throw new Error(`installed bin missing at ${bin}`);
 
@@ -52,7 +49,7 @@ beforeAll(() => {
     JSON.stringify({ nodeOptions: { require: "./marker.cjs" } }) + "\n",
   );
   writeFileSync(join(project, "node.config.json"), JSON.stringify({ nodeOptions: { require: "./marker.cjs" } }) + "\n");
-});
+}, 120_000);
 
 afterAll(() => {
   rmSync(prefix, { recursive: true, force: true });
@@ -66,7 +63,7 @@ function run(args: string[]): { code: number | null; markers: number } {
   return { code: r.status, markers: existsSync(marker) ? 1 : 0 };
 }
 
-describe("installed package: Node must not preload scanned files", () => {
+describe("installed package (git install): Node must not preload scanned files", () => {
   it("--file does not load NODE_OPTIONS from the scanned .env", () => {
     const r = run(["--file", ".env", "--offline", "--no-color"]);
     expect(r.code).toBe(0);

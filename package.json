@@ -26,13 +26,10 @@
   "engines": {
     "node": ">=22.13"
   },
-  "publishConfig": {
-    "access": "public",
-    "provenance": true
-  },
   "scripts": {
     "prebuild": "node scripts/gen-connectors.mjs",
     "build": "tsc -p tsconfig.build.json && node scripts/chmod-bin.mjs",
+    "prepare": "npm run build",
     "pretypecheck": "node scripts/gen-connectors.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "prelint": "node scripts/gen-connectors.mjs",
@@ -43,7 +40,6 @@
     "test:bin": "vitest run --config vitest.bin.config.ts",
     "check": "npm run typecheck && npm run lint && npm test && npm run build && npm run test:bin",
     "gen:connectors": "node scripts/gen-connectors.mjs",
-    "prepublishOnly": "npm run check",
     "fixtures": "node scripts/make-fixture.mjs canary .fixtures/canary && node scripts/make-fixture.mjs basic .fixtures/basic"
   },
   "keywords": [
@@ -68,5 +64,6 @@
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.72.0",
     "vitest": "^5.0.5"
-  }
+  },
+  "private": true
 }

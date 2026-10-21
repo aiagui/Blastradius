@@ -35,30 +35,30 @@ v0.1 checks **GitHub**, **Vercel** and **Stripe** credentials.
 
 ## Quick start
 
-Needs Node 22.13 or newer. Run it in your project without installing anything:
+Needs Node 22.13 or newer. This package is **not** published to npm; install it from GitHub.
 
 ```sh
-cd your-project
-npx @aiagui/blastradius
-```
-
-Or install it globally (the command is still `blastradius`):
-
-```sh
-npm install -g @aiagui/blastradius
+# Global install from a tag (builds dist/ via the prepare script)
+npm install -g github:aiagui/Blastradius#v0.2.1
 blastradius --dir ~/code/your-project
 ```
 
-Want to try it without touching the network first? Add `--offline`.
-
-### From source
+Or clone and run from source:
 
 ```sh
 git clone https://github.com/aiagui/Blastradius.git
 cd Blastradius
+git checkout v0.2.1   # or main
 npm ci && npm run build
+# either:
+npm link                          # puts blastradius on your PATH
+# or:
 node dist/cli.js --dir ~/code/your-project
 ```
+
+Want to try it without touching the network first? Add `--offline`.
+
+The installed bin starts with `#!/usr/bin/env -S node --`. That needs an `env` that supports `-S` (GNU coreutils ≥ 8.30, FreeBSD/macOS). On Alpine install `coreutils-env`; BusyBox `env` has no `-S` and the bin will not start. Prefer the installed bin or `npm exec --` over calling `node dist/cli.js` with flags Node also reads (`--env-file*`, `--experimental-*config-file`).
 
 ## Reading the report
 
@@ -178,9 +178,7 @@ because a valid key behind an IP or network policy can still move money.
 
 Exit codes: `0` ok, `1` `--fail-on` threshold reached, `2` usage error, `70` internal error.
 
-Use `-f`/`--file` to pick files. Don't pass `--env-file`, `--env-file-if-exists`, `--experimental-config-file` or `--experimental-default-config-file`: those are Node.js options, so Node reads that file itself before blastradius starts. blastradius exits with code 2 if it sees them.
-
-The installed bin starts Node with `--` (`#!/usr/bin/env -S node --`), so `--env-file*` passed to the bin no longer reaches Node's own option parser. That needs a `env` that supports `-S` (GNU coreutils ≥ 8.30, FreeBSD/macOS). On Alpine, install `coreutils-env` or run through a full coreutils `env`; BusyBox `env` has no `-S` and the bin will not start. Calling `node path/to/cli.js --env-file …` yourself, or `npx` without `--` before the package arguments, still lets Node read the file. `--experimental-*config-file` is still loaded by Node even after `--`.
+Use `-f`/`--file` to pick files. Don't pass `--env-file`, `--env-file-if-exists`, `--experimental-config-file` or `--experimental-default-config-file`: those are Node.js options, so Node reads that file itself before blastradius starts. blastradius exits with code 2 if it sees them. See [Quick start](#quick-start) for shebang and install notes.
 
 </details>
 

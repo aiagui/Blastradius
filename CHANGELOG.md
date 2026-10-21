@@ -11,13 +11,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
-- The installed bin now starts Node with `--` (`#!/usr/bin/env -S node --`), so `--env-file*` passed to the bin no longer reaches Node's own option parser. Calling `node path/to/cli.js --env-file …` yourself, or `npx` without `--` before the package args, still lets Node read the file. `--experimental-*config-file` is still loaded by Node even after `--`; never pass those flags. Needs `env -S` (GNU coreutils ≥ 8.30, FreeBSD/macOS). On Alpine install `coreutils-env`; BusyBox `env` has no `-S`.
+- The installed bin now starts Node with `--` (`#!/usr/bin/env -S node --`), so `--env-file*` passed to the bin no longer reaches Node's own option parser. Calling `node path/to/cli.js --env-file …` yourself still lets Node read the file. `--experimental-*config-file` is still loaded by Node even after `--`; never pass those flags. Needs `env -S` (GNU coreutils ≥ 8.30, FreeBSD/macOS). On Alpine install `coreutils-env`; BusyBox `env` has no `-S`.
 - Argument parse errors redact token-shaped substrings before printing to stderr.
 - `.env` files that are not regular files, that are larger than 1 MiB, or whose symlink target resolves outside `--dir` are skipped (with a stderr note).
 
 ### Added
 
 - Detects GitHub App refresh tokens (`ghr_`) and Stripe webhook signing secrets (`whsec_`). Both are reported offline; refresh tokens are never sent to the API.
+
+### Changed
+
+- The package is no longer published to npm. Install from GitHub
+  (`npm install -g github:aiagui/Blastradius#v0.2.1`, or clone and build).
+  The release workflow only creates the GitHub release. `package.json` is
+  `"private": true` and a `prepare` script builds `dist/` on git installs.
 
 ## [0.2.0] - 2026-10-21
 
