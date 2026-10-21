@@ -8,7 +8,7 @@
 //
 // Usage: node scripts/gen-connectors.mjs          write the registry
 //        node scripts/gen-connectors.mjs --check  exit 1 if it is missing or stale
-import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -68,10 +68,20 @@ export function renderRegistry(ids) {
   return lines.join("\n");
 }
 
+/** The current registry contents, or "" if it does not exist yet. */
+function readCurrent() {
+  try {
+    return readFileSync(OUTPUT, "utf8");
+  } catch (err) {
+    if (/** @type {NodeJS.ErrnoException} */ (err).code === "ENOENT") return "";
+    throw err;
+  }
+}
+
 /** Writes the registry if it is missing or stale. Used by the CLI entry and by Vitest's globalSetup. */
 export function writeRegistry() {
   const expected = renderRegistry(discoverConnectors());
-  const current = existsSync(OUTPUT) ? readFileSync(OUTPUT, "utf8") : "";
+  const current = readCurrent();
   if (current !== expected) writeFileSync(OUTPUT, expected);
 }
 
@@ -80,7 +90,7 @@ function run() {
     writeRegistry();
     return;
   }
-  const current = existsSync(OUTPUT) ? readFileSync(OUTPUT, "utf8") : "";
+  const current = readCurrent();
   if (current !== renderRegistry(discoverConnectors())) {
     console.error("src/connectors/registry.generated.ts is stale. Run: node scripts/gen-connectors.mjs");
     process.exitCode = 1;
