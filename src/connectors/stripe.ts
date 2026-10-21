@@ -225,7 +225,7 @@ export const stripe: Connector = {
           level: "amber",
           confidence: "inferred",
           message: "Webhook signing secret: anyone with this value can forge webhooks for the endpoint.",
-          advice: "Roll it in the Stripe Dashboard (Developers > Webhooks) and store the new value in a secrets vault.",
+          advice: "Roll this signing secret in your provider dashboard and store the new value in a secrets vault.",
           capabilities: { read: false, write: false, move_money: false, forge_webhooks: true },
         },
       ];

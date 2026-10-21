@@ -214,7 +214,7 @@ function inferred(kind: string | undefined): Finding {
         confidence: "inferred",
         message: "GitHub App refresh token: used to mint new user access tokens. It is not a REST API credential.",
         advice: "Remove it from .env files. Store refresh tokens in a secrets vault, never next to a client secret.",
-        capabilities: { read_private_repos: false, write_repos: false },
+        capabilities: { read_private_repos: "unknown", write_repos: "unknown" },
       };
     default:
       return {

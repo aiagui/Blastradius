@@ -76,6 +76,7 @@ describe("github: detection", () => {
     expect(calls).toHaveLength(0);
     expect(findings[0]).toMatchObject({ level: "amber", confidence: "inferred" });
     expect(findings[0]!.message).toMatch(/refresh token/i);
+    expect(findings[0]!.capabilities).toMatchObject({ read_private_repos: "unknown", write_repos: "unknown" });
   });
 
   it("detects legacy 40-hex tokens only under GitHub env names", () => {
