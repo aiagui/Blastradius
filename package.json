@@ -28,7 +28,7 @@
   },
   "scripts": {
     "prebuild": "node scripts/gen-connectors.mjs",
-    "build": "tsc -p tsconfig.build.json && node scripts/chmod-bin.mjs",
+    "build": "node ./node_modules/typescript/bin/tsc -p tsconfig.build.json && node scripts/chmod-bin.mjs",
     "prepare": "npm run build",
     "prepublishOnly": "node -e \"console.error('This package is private and is not published to npm.'); process.exit(1)\"",
     "pretypecheck": "node scripts/gen-connectors.mjs",
