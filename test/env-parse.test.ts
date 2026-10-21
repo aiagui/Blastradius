@@ -4,7 +4,7 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { findEnvFiles, loadEnvDir, MAX_ENV_FILE_BYTES, parseEnv } from "../src/env/parse.js";
+import { findEnvFiles, isPathInside, loadEnvDir, MAX_ENV_FILE_BYTES, parseEnv } from "../src/env/parse.js";
 
 const kv = (s: string): Record<string, string> => Object.fromEntries(parseEnv(s).map((e) => [e.key, e.value]));
 
@@ -108,4 +108,29 @@ describe("loadEnvDir safety", () => {
     expect(entries).toEqual([]);
     expect(skipped).toEqual([{ name: ".env", reason: "too_large" }]);
   });
+
+  it("allows a symlink into a directory whose name starts with ..", async () => {
+    const root = await mkdtemp(join(tmpdir(), "br-env-"));
+    const odd = join(root, "..data");
+    await writeFile(join(root, ".keep"), "");
+    const { mkdirSync } = await import("node:fs");
+    mkdirSync(odd);
+    writeFileSync(join(odd, "e"), "INSIDE=1\n");
+    symlinkSync(join(odd, "e"), join(root, ".env"));
+    const { entries, skipped } = await loadEnvDir(root);
+    expect(skipped).toEqual([]);
+    expect(entries.map((e) => e.key)).toEqual(["INSIDE"]);
+  });
+});
+
+describe("isPathInside", () => {
+  it("rejects .. segments but allows ..data", () => {
+    expect(isPathInside("/app", "/app/..data/e")).toBe(true);
+    expect(isPathInside("/app", "/app/sub/f")).toBe(true);
+    expect(isPathInside("/app", "/app/../outside")).toBe(false);
+    expect(isPathInside("/app", "/outside")).toBe(false);
+    expect(isPathInside("/app", "/app")).toBe(false);
+  });
+
+
 });

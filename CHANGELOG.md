@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The installed bin now starts Node with `--` (`#!/usr/bin/env -S node --`), so `--env-file*` passed to the bin no longer reaches Node's own option parser. Calling `node path/to/cli.js --env-file …` yourself still lets Node read the file. `--experimental-*config-file` is still loaded by Node even after `--`; never pass those flags. Needs `env -S` (GNU coreutils ≥ 8.30, FreeBSD/macOS). On Alpine install `coreutils-env`; BusyBox `env` has no `-S`.
 - Argument parse errors redact token-shaped substrings before printing to stderr.
-- `.env` files that are not regular files, that are larger than 1 MiB, or whose symlink target resolves outside `--dir` are skipped (with a stderr note).
+- `.env` files that are not regular files, that are larger than 1 MiB, or whose symlink target resolves outside `--dir` are skipped (with a stderr note). On Linux/macOS the file is opened once with `O_NOFOLLOW|O_NONBLOCK` and read through that fd (closes the symlink/FIFO TOCTOU race). Windows falls back to realpath-then-open.
 
 ### Added
 

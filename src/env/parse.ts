@@ -7,8 +7,9 @@
  *   KEY=value # comment  multi-line values inside double or single quotes
  * Not supported (on purpose): variable expansion (${OTHER}), command substitution.
  */
-import { lstat, readFile, readdir, realpath, stat } from "node:fs/promises";
-import { isAbsolute, join, relative, resolve } from "node:path";
+import { constants } from "node:fs";
+import { open, readdir, realpath } from "node:fs/promises";
+import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
 export interface EnvEntry {
   readonly key: string;
@@ -139,55 +140,134 @@ export interface EnvSkip {
 }
 
 /**
+ * True when `target` is a path strictly inside `root` (after both are resolved).
+ * Uses a path-segment check so a directory named `..data` is not treated as `..`.
+ */
+export function isPathInside(root: string, target: string): boolean {
+  const rel = relative(root, target);
+  if (rel === "" || isAbsolute(rel)) return false;
+  if (rel === "..") return false;
+  // relative() uses the platform separator; also accept the other one.
+  if (rel.startsWith(`..${sep}`) || rel.startsWith("../") || rel.startsWith("..\\")) return false;
+  return true;
+}
+
+const OPEN_FLAGS =
+  constants.O_RDONLY |
+  (typeof constants.O_NONBLOCK === "number" ? constants.O_NONBLOCK : 0) |
+  (typeof constants.O_NOFOLLOW === "number" ? constants.O_NOFOLLOW : 0);
+
+
+function errorCode(err: unknown): string {
+  if (typeof err !== "object" || err === null || !("code" in err)) return "";
+  const code: unknown = Reflect.get(err, "code");
+  return typeof code === "string" || typeof code === "number" ? String(code) : "";
+}
+
+const HAS_NOFOLLOW = typeof constants.O_NOFOLLOW === "number" && constants.O_NOFOLLOW !== 0;
+
+/**
  * Reads one env file under `dir` after rejecting unsafe targets.
- * Symlinks are followed only when the resolved path stays inside `dir`.
- * Returns null when the file should be skipped (missing or unsafe).
+ *
+ * On platforms with O_NOFOLLOW (Linux, macOS): open the path once with
+ * O_RDONLY|O_NOFOLLOW|O_NONBLOCK, fstat the fd, require a regular file within
+ * the size cap, confirm the opened path's realpath stays inside `--dir`, then
+ * read at most MAX+1 bytes from the fd. Symlinks to a file inside `--dir` are
+ * opened via their realpath (also with O_NOFOLLOW). This closes the TOCTOU
+ * window where a racer could swap in a symlink or FIFO between lstat and read.
+ *
+ * Residual: a symlink in a *directory component* of the path can still point
+ * the final open outside `--dir` until we check realpath after open; we reject
+ * that case. A replace of the file after open with a hardlink is not prevented
+ * (same inode). Windows has no O_NOFOLLOW, so we fall back to realpath + open.
  */
 export async function readEnvFile(
   dir: string,
   name: string,
 ): Promise<{ content: string } | { skip: EnvSkipReason }> {
   const path = join(dir, name);
-  let link;
+  let dirReal: string;
   try {
-    link = await lstat(path);
+    dirReal = await realpath(dir);
   } catch {
     return { skip: "unreadable" };
   }
 
-  if (link.isSymbolicLink()) {
-    let target: string;
-    let dirReal: string;
-    try {
-      target = await realpath(path);
-      dirReal = await realpath(dir);
-    } catch {
-      return { skip: "unreadable" };
-    }
-    const rel = relative(dirReal, target);
-    if (rel === "" || rel.startsWith("..") || isAbsolute(rel)) {
-      return { skip: "symlink_outside" };
-    }
-    let targetStat;
-    try {
-      targetStat = await stat(target);
-    } catch {
-      return { skip: "unreadable" };
-    }
-    if (!targetStat.isFile()) return { skip: "not_regular" };
-    if (targetStat.size > MAX_ENV_FILE_BYTES) return { skip: "too_large" };
-    try {
-      return { content: await readFile(target, "utf8") };
-    } catch {
-      return { skip: "unreadable" };
-    }
+  if (!HAS_NOFOLLOW) {
+    return readEnvFileFallback(dirReal, path);
   }
 
-  if (!link.isFile()) return { skip: "not_regular" };
-  if (link.size > MAX_ENV_FILE_BYTES) return { skip: "too_large" };
   try {
-    return { content: await readFile(path, "utf8") };
+    return await readFromOpenPath(path, dirReal);
+  } catch (err: unknown) {
+    const code = errorCode(err);
+    // ELOOP: path is a symlink and O_NOFOLLOW refused it. Allow only if the
+    // resolved target stays inside --dir, then open that target with O_NOFOLLOW.
+    if (code === "ELOOP" || code === "EMLINK") {
+      let target: string;
+      try {
+        target = await realpath(path);
+      } catch {
+        return { skip: "unreadable" };
+      }
+      if (!isPathInside(dirReal, target)) return { skip: "symlink_outside" };
+      try {
+        return await readFromOpenPath(target, dirReal);
+      } catch {
+        return { skip: "unreadable" };
+      }
+    }
+    if (code === "ENOENT") return { skip: "unreadable" };
+    // EISDIR, ENXIO (fifo on some systems after NONBLOCK), etc.
+    if (code === "EISDIR" || code === "ENXIO" || code === "EAGAIN") return { skip: "not_regular" };
+    return { skip: "unreadable" };
+  }
+}
+
+async function readFromOpenPath(
+  path: string,
+  dirReal: string,
+): Promise<{ content: string } | { skip: EnvSkipReason }> {
+  const fh = await open(path, OPEN_FLAGS);
+  try {
+    const st = await fh.stat();
+    if (!st.isFile()) return { skip: "not_regular" };
+    if (st.size > MAX_ENV_FILE_BYTES) return { skip: "too_large" };
+
+    let openedReal: string;
+    try {
+      openedReal = await realpath(path);
+    } catch {
+      return { skip: "unreadable" };
+    }
+    if (!isPathInside(dirReal, openedReal)) return { skip: "symlink_outside" };
+
+    const buf = Buffer.allocUnsafe(MAX_ENV_FILE_BYTES + 1);
+    const { bytesRead } = await fh.read(buf, 0, MAX_ENV_FILE_BYTES + 1, 0);
+    if (bytesRead > MAX_ENV_FILE_BYTES) return { skip: "too_large" };
+    return { content: buf.subarray(0, bytesRead).toString("utf8") };
+  } finally {
+    await fh.close().catch(() => undefined);
+  }
+}
+
+/** Windows / platforms without O_NOFOLLOW: realpath then open the resolved path. */
+async function readEnvFileFallback(
+  dirReal: string,
+  path: string,
+): Promise<{ content: string } | { skip: EnvSkipReason }> {
+  let target: string;
+  try {
+    target = await realpath(path);
   } catch {
+    return { skip: "unreadable" };
+  }
+  if (!isPathInside(dirReal, target)) return { skip: "symlink_outside" };
+  try {
+    return await readFromOpenPath(target, dirReal);
+  } catch (err: unknown) {
+    const code = errorCode(err);
+    if (code === "EISDIR" || code === "ENXIO" || code === "EAGAIN") return { skip: "not_regular" };
     return { skip: "unreadable" };
   }
 }
