@@ -33,6 +33,16 @@ describe("cli", () => {
     expect((await cli(["--file", "../secrets/.env"])).code).toBe(EXIT.usage);
   });
 
+  it("redacts token-shaped positionals from argument errors", async () => {
+    const token = `ghp_${"Z".repeat(36)}`;
+    const r = await cli([token]);
+    expect(r.code).toBe(EXIT.usage);
+    expect(r.err).toContain("[REDACTED]");
+    expect(r.err).not.toContain(token);
+    expect(r.err).not.toContain("ghp_Z");
+  });
+
+
   it.each([
     ["--env-file", ".env"],
     ["--env-file=.env"],

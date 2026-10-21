@@ -1,8 +1,10 @@
+import { execFileSync } from "node:child_process";
+import { symlinkSync, writeFileSync } from "node:fs";
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { findEnvFiles, loadEnvDir, parseEnv } from "../src/env/parse.js";
+import { findEnvFiles, loadEnvDir, MAX_ENV_FILE_BYTES, parseEnv } from "../src/env/parse.js";
 
 const kv = (s: string): Record<string, string> => Object.fromEntries(parseEnv(s).map((e) => [e.key, e.value]));
 
@@ -61,11 +63,49 @@ describe("findEnvFiles / loadEnvDir", () => {
       await writeFile(join(dir, n), `FROM=${n}\n`);
     }
     expect(await findEnvFiles(dir)).toEqual([".env", ".env.local", ".env.production", ".env.staging"]);
-    const entries = await loadEnvDir(dir);
+    const { entries } = await loadEnvDir(dir);
     expect(entries.map((e) => e.source)).toEqual([".env", ".env.local", ".env.production", ".env.staging"]);
   });
 
   it("returns nothing for a missing directory", async () => {
     expect(await findEnvFiles(join(tmpdir(), "does-not-exist-br"))).toEqual([]);
+  });
+});
+
+describe("loadEnvDir safety", () => {
+  it("skips symlinks that resolve outside the scanned directory", async () => {
+    const root = await mkdtemp(join(tmpdir(), "br-env-"));
+    const outside = await mkdtemp(join(tmpdir(), "br-out-"));
+    writeFileSync(join(outside, "secret.env"), "GITHUB_TOKEN=ghp_OUTSIDE00000000000000000000000001\n");
+    writeFileSync(join(root, ".env"), "A=1\n");
+    symlinkSync(join(outside, "secret.env"), join(root, ".env.local"));
+    const { entries, skipped } = await loadEnvDir(root);
+    expect(entries.map((e) => e.key)).toEqual(["A"]);
+    expect(skipped).toEqual([{ name: ".env.local", reason: "symlink_outside" }]);
+  });
+
+  it("reads a symlink that stays inside --dir", async () => {
+    const root = await mkdtemp(join(tmpdir(), "br-env-"));
+    writeFileSync(join(root, "real.env"), "INSIDE=1\n");
+    symlinkSync(join(root, "real.env"), join(root, ".env"));
+    const { entries, skipped } = await loadEnvDir(root);
+    expect(entries.map((e) => [e.key, e.value])).toEqual([["INSIDE", "1"]]);
+    expect(skipped).toEqual([]);
+  });
+
+  it("skips FIFOs", async () => {
+    const root = await mkdtemp(join(tmpdir(), "br-env-"));
+    execFileSync("mkfifo", [join(root, ".env")]);
+    const { entries, skipped } = await loadEnvDir(root);
+    expect(entries).toEqual([]);
+    expect(skipped).toEqual([{ name: ".env", reason: "not_regular" }]);
+  });
+
+  it("skips files larger than MAX_ENV_FILE_BYTES", async () => {
+    const root = await mkdtemp(join(tmpdir(), "br-env-"));
+    writeFileSync(join(root, ".env"), "X=" + "y".repeat(MAX_ENV_FILE_BYTES) + "\n");
+    const { entries, skipped } = await loadEnvDir(root);
+    expect(entries).toEqual([]);
+    expect(skipped).toEqual([{ name: ".env", reason: "too_large" }]);
   });
 });

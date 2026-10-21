@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env -S node --
 import { realpathSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -20,6 +20,28 @@ export interface Io {
 }
 
 export const EXIT = { ok: 0, threshold: 1, usage: 2, internal: 70 } as const;
+
+
+/** Token-shaped substrings that must never appear in CLI error text. */
+const SECRETISH = /(?:gh[pousr]_|github_pat_|[srp]k_(?:live|test)_|whsec_|vc[piar]_)[A-Za-z0-9_\-/+]{8,}|\b[0-9a-f]{40}\b/gi;
+
+function redactArgError(err: unknown): string {
+  if (!(err instanceof Error)) return "invalid arguments";
+  return err.message.replace(SECRETISH, "[REDACTED]");
+}
+
+function skipReasonText(reason: string): string {
+  switch (reason) {
+    case "not_regular":
+      return "not a regular file";
+    case "symlink_outside":
+      return "symlink points outside the scanned directory";
+    case "too_large":
+      return "larger than 1 MiB";
+    default:
+      return "could not be read";
+  }
+}
 
 const HELP = `Usage: blastradius [options]
 
@@ -93,7 +115,9 @@ export async function main(argv: readonly string[], io: Io): Promise<number> {
       },
     });
   } catch (err: unknown) {
-    io.stderr(`blastradius: ${err instanceof Error ? err.message : "invalid arguments"}\n\n${HELP}`);
+    // parseArgs echoes the offending argument. A token passed by mistake
+    // (blastradius $GITHUB_TOKEN) must not appear on stderr.
+    io.stderr(`blastradius: ${redactArgError(err)}\n\n${HELP}`);
     return EXIT.usage;
   }
   const v = parsed.values;
@@ -129,6 +153,10 @@ export async function main(argv: readonly string[], io: Io): Promise<number> {
     // Do not print the error: it could contain file contents.
     io.stderr("blastradius: internal error while scanning\n");
     return EXIT.internal;
+  }
+
+  for (const skip of result.skipped) {
+    io.stderr(`blastradius: skipped ${skip.name}: ${skipReasonText(skip.reason)}\n`);
   }
 
   const color = !v["no-color"] && io.isTTY && io.env["NO_COLOR"] === undefined;

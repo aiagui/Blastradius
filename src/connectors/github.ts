@@ -2,7 +2,7 @@
  * GitHub connector.
  *
  * Detects GitHub tokens by their documented prefixes (`ghp_`, `gho_`, `ghu_`,
- * `ghs_`, `github_pat_`) in any env var, plus legacy 40-hex tokens in
+ * `ghs_`, `ghr_`, `github_pat_`) in any env var, plus legacy 40-hex tokens in
  * `GITHUB_TOKEN`, `GH_TOKEN` and `GITHUB_PAT`.
  *
  * Live check (at most 2 GET requests per credential, both to api.github.com):
@@ -29,7 +29,7 @@ const HOST = "api.github.com";
 const API_HEADERS = { accept: "application/vnd.github+json", "x-github-api-version": "2022-11-28" } as const;
 
 /** Prefixed tokens. Current tokens are 40 chars; GitHub reserves room to grow, so lengths are generous. */
-const PREFIXED = /^(?:gh[pous]_[A-Za-z0-9]{36,251}|github_pat_[A-Za-z0-9_]{36,244})$/;
+const PREFIXED = /^(?:gh[pousr]_[A-Za-z0-9]{36,251}|github_pat_[A-Za-z0-9_]{36,244})$/;
 const LEGACY = /^[0-9a-f]{40}$/;
 const LEGACY_KEYS = ["GITHUB_TOKEN", "GH_TOKEN", "GITHUB_PAT"] as const;
 
@@ -38,6 +38,7 @@ export type GithubKind =
   | "OAuth token"
   | "GitHub App user token"
   | "GitHub App installation token"
+  | "GitHub App refresh token"
   | "fine-grained PAT"
   | "legacy token";
 
@@ -47,6 +48,7 @@ export function githubKind(value: string): GithubKind {
   if (value.startsWith("gho_")) return "OAuth token";
   if (value.startsWith("ghu_")) return "GitHub App user token";
   if (value.startsWith("ghs_")) return "GitHub App installation token";
+  if (value.startsWith("ghr_")) return "GitHub App refresh token";
   return "legacy token";
 }
 
@@ -206,6 +208,14 @@ function inferred(kind: string | undefined): Finding {
         advice: "Do not store user tokens in .env files; revoke it from the app's settings.",
         capabilities: { read_private_repos: "unknown", write_repos: "unknown" },
       };
+    case "GitHub App refresh token":
+      return {
+        level: "amber",
+        confidence: "inferred",
+        message: "GitHub App refresh token: used to mint new user access tokens. It is not a REST API credential.",
+        advice: "Remove it from .env files. Store refresh tokens in a secrets vault, never next to a client secret.",
+        capabilities: { read_private_repos: false, write_repos: false },
+      };
     default:
       return {
         level: "amber",
@@ -269,6 +279,8 @@ export const github: Connector = {
 
   async check(secret: Secret, ctx: CheckContext): Promise<Finding[]> {
     const base = inferred(secret.kind);
+    // Refresh tokens are not Bearer credentials for api.github.com.
+    if (secret.kind === "GitHub App refresh token") return [base];
     if (ctx.offline) return [base];
 
     let user: SafeResponse;

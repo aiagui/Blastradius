@@ -19,6 +19,7 @@ const T = {
   user: "ghu_FAKEgithubAPPUSER0000000000000000001",
   install: "ghs_FAKEgithubINSTALL0000000000000000001",
   fine: "github_pat_FAKEgithubFINE00000000001_00000000000000000000000000000000000000000000000000000001",
+  refresh: `ghr_${"R".repeat(40)}`,
   legacy: "0123456789abcdef0123456789abcdef01234567",
 } as const;
 
@@ -54,6 +55,7 @@ describe("github: detection", () => {
         `APP_USER=${T.user}`,
         `CI_INSTALL=${T.install}`,
         `GH_TOKEN=${T.fine}`,
+        `GH_REFRESH=${T.refresh}`,
       ].join("\n"),
       ".env",
     );
@@ -64,7 +66,16 @@ describe("github: detection", () => {
       ["APP_USER", "GitHub App user token"],
       ["CI_INSTALL", "GitHub App installation token"],
       ["GH_TOKEN", "fine-grained PAT"],
+      ["GH_REFRESH", "GitHub App refresh token"],
     ]);
+  });
+
+  it("does not send refresh tokens to the API", async () => {
+    const calls = mockFetch();
+    const findings = await github.check(one(T.refresh), ctx(false));
+    expect(calls).toHaveLength(0);
+    expect(findings[0]).toMatchObject({ level: "amber", confidence: "inferred" });
+    expect(findings[0]!.message).toMatch(/refresh token/i);
   });
 
   it("detects legacy 40-hex tokens only under GitHub env names", () => {
@@ -197,7 +208,7 @@ describe("github: live checks (mocked)", () => {
     expect(f).toMatchObject({ level: "amber", confidence: "unknown" });
   });
 
-  it.each(Object.entries(T))("401 (%s) is green with confidence inferred, not confirmed (could be a GHES token)", async (_kind, value) => {
+  it.each(Object.entries(T).filter(([k]) => k !== "refresh"))("401 (%s) is green with confidence inferred, not confirmed (could be a GHES token)", async (_kind, value) => {
     const calls = api({ status: 401, body: fixture("bad-credentials.json") });
     const fs = await github.check(one(value), ctx(false));
     expect(fs).toHaveLength(1);

@@ -7,8 +7,8 @@
  *   KEY=value # comment  multi-line values inside double or single quotes
  * Not supported (on purpose): variable expansion (${OTHER}), command substitution.
  */
-import { readFile, readdir } from "node:fs/promises";
-import { join } from "node:path";
+import { lstat, readFile, readdir, realpath, stat } from "node:fs/promises";
+import { isAbsolute, join, relative, resolve } from "node:path";
 
 export interface EnvEntry {
   readonly key: string;
@@ -128,18 +128,88 @@ export async function findEnvFiles(dir: string): Promise<string[]> {
   return found.sort((a, b) => order(a) - order(b) || a.localeCompare(b));
 }
 
+/** Cap on a single .env file. Larger files are skipped (finding F3). */
+export const MAX_ENV_FILE_BYTES = 1_048_576;
+
+export type EnvSkipReason = "not_regular" | "symlink_outside" | "too_large" | "unreadable";
+
+export interface EnvSkip {
+  readonly name: string;
+  readonly reason: EnvSkipReason;
+}
+
+/**
+ * Reads one env file under `dir` after rejecting unsafe targets.
+ * Symlinks are followed only when the resolved path stays inside `dir`.
+ * Returns null when the file should be skipped (missing or unsafe).
+ */
+export async function readEnvFile(
+  dir: string,
+  name: string,
+): Promise<{ content: string } | { skip: EnvSkipReason }> {
+  const path = join(dir, name);
+  let link;
+  try {
+    link = await lstat(path);
+  } catch {
+    return { skip: "unreadable" };
+  }
+
+  if (link.isSymbolicLink()) {
+    let target: string;
+    let dirReal: string;
+    try {
+      target = await realpath(path);
+      dirReal = await realpath(dir);
+    } catch {
+      return { skip: "unreadable" };
+    }
+    const rel = relative(dirReal, target);
+    if (rel === "" || rel.startsWith("..") || isAbsolute(rel)) {
+      return { skip: "symlink_outside" };
+    }
+    let targetStat;
+    try {
+      targetStat = await stat(target);
+    } catch {
+      return { skip: "unreadable" };
+    }
+    if (!targetStat.isFile()) return { skip: "not_regular" };
+    if (targetStat.size > MAX_ENV_FILE_BYTES) return { skip: "too_large" };
+    try {
+      return { content: await readFile(target, "utf8") };
+    } catch {
+      return { skip: "unreadable" };
+    }
+  }
+
+  if (!link.isFile()) return { skip: "not_regular" };
+  if (link.size > MAX_ENV_FILE_BYTES) return { skip: "too_large" };
+  try {
+    return { content: await readFile(path, "utf8") };
+  } catch {
+    return { skip: "unreadable" };
+  }
+}
+
 /** Reads and parses every .env* file in `dir`. All entries are kept (connectors dedupe). */
-export async function loadEnvDir(dir: string, files?: readonly string[]): Promise<EnvEntry[]> {
+export async function loadEnvDir(
+  dir: string,
+  files?: readonly string[],
+): Promise<{ entries: EnvEntry[]; skipped: EnvSkip[] }> {
   const list = files ?? (await findEnvFiles(dir));
   const entries: EnvEntry[] = [];
+  const skipped: EnvSkip[] = [];
+  // Resolve once so symlink checks are against the real scan root.
+  const root = resolve(dir);
   for (const name of list) {
-    let content: string;
-    try {
-      content = await readFile(join(dir, name), "utf8");
-    } catch {
+    const result = await readEnvFile(root, name);
+    if ("skip" in result) {
+      // Missing files stay silent (same as before). Everything else is recorded.
+      if (result.skip !== "unreadable") skipped.push({ name, reason: result.skip });
       continue;
     }
-    entries.push(...parseEnv(content, name));
+    entries.push(...parseEnv(result.content, name));
   }
-  return entries;
+  return { entries, skipped };
 }

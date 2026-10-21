@@ -180,6 +180,8 @@ Exit codes: `0` ok, `1` `--fail-on` threshold reached, `2` usage error, `70` int
 
 Use `-f`/`--file` to pick files. Don't pass `--env-file`, `--env-file-if-exists`, `--experimental-config-file` or `--experimental-default-config-file`: those are Node.js options, so Node reads that file itself before blastradius starts. blastradius exits with code 2 if it sees them.
 
+The installed bin starts Node with `--` (`#!/usr/bin/env -S node --`), so `--env-file*` passed to the bin no longer reaches Node's own option parser. That needs a `env` that supports `-S` (GNU coreutils ≥ 8.30, FreeBSD/macOS). On Alpine, install `coreutils-env` or run through a full coreutils `env`; BusyBox `env` has no `-S` and the bin will not start. Calling `node path/to/cli.js --env-file …` yourself, or `npx` without `--` before the package arguments, still lets Node read the file. `--experimental-*config-file` is still loaded by Node even after `--`.
+
 </details>
 
 <details>
