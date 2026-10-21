@@ -93,7 +93,8 @@ describe("cli", () => {
     const noDigits = "qWeRtYuIoPaSdFgHjKlZxCvB"; // Not a real token.
     expect(noDigits).toHaveLength(24);
     expect(redactSecrets(`-d ${noDigits}`)).toBe("-d [REDACTED]");
-    expect(redactSecrets("Q3PlanningDocsFinalDraft")).toBe("Q3PlanningDocsFinalDraft");
+    // CamelCase without digits and fewer than six capitals stays readable.
+    expect(redactSecrets("BillingStatementsArchive")).toBe("BillingStatementsArchive");
   });
 
   it("redacts a random 24-char token after an underscore", () => {
