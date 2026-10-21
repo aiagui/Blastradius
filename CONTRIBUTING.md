@@ -45,8 +45,11 @@ git URL (`npm install -g github:…`) fails prepare today; a project-local
    new `## [x.y.z] - YYYY-MM-DD` section in the changelog.
 2. After it is merged, tag the merge commit and push the tag:
    `git tag vX.Y.Z && git push origin vX.Y.Z`.
-3. The release workflow checks that the tag is on `main` and matches
-   `package.json`, then creates the GitHub release from the changelog entry.
+3. The release workflow checks that the tag is on `main`, matches
+   `package.json`, and that both `CI` jobs (`typecheck, lint, test, build
+   (Node 22)` and `(Node 24)`) succeeded on the tagged commit. If you rename
+   those jobs, update `.github/scripts/require-ci.sh`. It then creates the
+   GitHub release from the changelog entry.
 
 ## Local checks
 

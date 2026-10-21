@@ -24,6 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The package is no longer published to npm. Install by cloning a release
   tag, then `npm ci && npm install -g .` (or `node dist/cli.js`). The release
   workflow only creates the GitHub release. `package.json` is `"private": true`.
+- The release workflow creates the release only if both CI jobs
+  (`typecheck, lint, test, build (Node 22)` and `(Node 24)`) succeeded on the
+  tagged commit. Other check runs, including the release job's own, are ignored.
 
 ## [0.2.0] - 2026-10-21
 

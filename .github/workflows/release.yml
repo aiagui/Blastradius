@@ -48,25 +48,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          # Require every GitHub Actions check-run on this commit to have succeeded.
-          mapfile -t lines < <(gh api --paginate             "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/check-runs"             --jq '.check_runs[] | select(.app.slug=="github-actions") | "\(.name)\t\(.status)\t\(.conclusion)"')
-          if [ "${#lines[@]}" -eq 0 ]; then
-            echo "::error::No GitHub Actions check runs found for this commit."
-            exit 1
-          fi
-          bad=0
-          for line in "${lines[@]}"; do
-            IFS=$'\t' read -r name status conclusion <<<"$line"
-            echo "$name: $status/$conclusion"
-            if [ "$status" != "completed" ]; then
-              echo "::error::$name is still $status"
-              bad=1
-            elif [ "$conclusion" != "success" ] && [ "$conclusion" != "skipped" ] && [ "$conclusion" != "neutral" ]; then
-              echo "::error::$name concluded $conclusion"
-              bad=1
-            fi
-          done
-          [ "$bad" -eq 0 ]
+          # Only the named CI jobs count, and only for this exact commit.
+          # Other check runs, including this release job's own, are ignored.
+          # If the API call fails the step fails (pipefail), so it fails closed.
+          gh api --paginate \
+            "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/check-runs?per_page=100" \
+            --jq '.check_runs[] | select(.app.slug == "github-actions") | {name, id, status, conclusion}' \
+            > check-runs.json
+          .github/scripts/require-ci.sh < check-runs.json
       - name: Create the release from the CHANGELOG entry
         env:
           GH_TOKEN: ${{ github.token }}
