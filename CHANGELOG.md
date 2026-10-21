@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- The CLI no longer accepts command-line flags that Node.js also reads as its own options. Details will follow in a security advisory.
+
+### Changed
+
+- **Breaking:** `--env-file <name>` is now `--file <name>`; `-f` is unchanged. Node.js treats `--env-file` as its own option even after the script name ([nodejs/node#54232](https://github.com/nodejs/node/issues/54232)), so `--dir <other> --env-file <name>` could fail with `node: <name>: not found` (exit 9).
+- Passing `--env-file`, `--env-file=…`, `--env-file-if-exists` or `--env-file-if-exists=…` now exits with code 2 and points to `--file`. Node.js still reads such a file before blastradius starts; this check only stops the flag from looking like it works. Use `-f`/`--file`.
+
 ## [0.1.0] - 2026-10-20
 
 First release, published to npm as `@aiagui/blastradius` (the command is `blastradius`).

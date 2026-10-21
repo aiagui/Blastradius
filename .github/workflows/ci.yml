@@ -38,6 +38,8 @@ jobs:
       # Includes the secret canary test and the read-only allowlist tests.
       - run: npm test
       - run: npm run build
+      # Runs the built bin as a real process (symlinked like an npm install).
+      - run: npm run test:bin
       # Fake-credential fixtures are generated, not committed (scripts/make-fixture.mjs).
       - run: npm run fixtures
       - name: Smoke test the built CLI on the basic fixture (offline)

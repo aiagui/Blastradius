@@ -30,7 +30,30 @@ describe("cli", () => {
   it("rejects bad arguments with exit 2", async () => {
     expect((await cli(["--nope"])).code).toBe(EXIT.usage);
     expect((await cli(["--fail-on", "green"])).code).toBe(EXIT.usage);
-    expect((await cli(["--env-file", "../secrets/.env"])).code).toBe(EXIT.usage);
+    expect((await cli(["--file", "../secrets/.env"])).code).toBe(EXIT.usage);
+  });
+
+  it.each([
+    ["--env-file", ".env"],
+    ["--env-file=.env"],
+    ["--env-file-if-exists", ".env"],
+    ["--env-file-if-exists=.env"],
+    ["--offline", "--env-file", ".env"],
+  ])("rejects Node's own file flags: %s", async (...args: string[]) => {
+    const r = await cli(args);
+    expect(r.code).toBe(EXIT.usage);
+    expect(r.err).toContain("is a Node.js option");
+    expect(r.err).toContain("-f/--file");
+    expect(r.out).toBe("");
+  });
+
+  it("--file and -f select files inside --dir", async () => {
+    const long = await cli(["--file", ".env", "--offline"]);
+    expect(long.code).toBe(EXIT.ok);
+    expect(long.out).toContain("Scanned: .env");
+    const short = await cli(["-f", ".env", "--offline"]);
+    expect(short.code).toBe(EXIT.ok);
+    expect(short.out).toContain("Scanned: .env");
   });
 
   it("prints a terminal report and skips .env.example", async () => {

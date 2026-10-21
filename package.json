@@ -40,7 +40,8 @@
     "pretest": "node scripts/gen-connectors.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check": "npm run typecheck && npm run lint && npm test && npm run build",
+    "test:bin": "vitest run --config vitest.bin.config.ts",
+    "check": "npm run typecheck && npm run lint && npm test && npm run build && npm run test:bin",
     "gen:connectors": "node scripts/gen-connectors.mjs",
     "prepublishOnly": "npm run check",
     "fixtures": "node scripts/make-fixture.mjs canary .fixtures/canary && node scripts/make-fixture.mjs basic .fixtures/basic"

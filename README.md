@@ -170,13 +170,15 @@ because a valid key behind an IP or network policy can still move money.
 | Flag | What it does |
 | --- | --- |
 | `-d, --dir <path>` | Directory to scan (default: current directory) |
-| `-f, --env-file <name>` | Only read this file, repeatable (default: every `.env*` file except `*.example`, `*.sample`, `*.template`) |
+| `-f, --file <name>` | Only read this file inside `--dir`, repeatable (default: every `.env*` file except `*.example`, `*.sample`, `*.template`) |
 | `--offline` | Never call any API; report only what can be inferred from the credential format |
 | `--json` | Machine-readable report |
 | `--fail-on <red\|amber>` | Exit with code 1 if any credential is at least that level (for CI) |
 | `--no-color` | Plain output (`NO_COLOR` is honoured too) |
 
 Exit codes: `0` ok, `1` `--fail-on` threshold reached, `2` usage error, `70` internal error.
+
+Use `-f`/`--file` to pick files. Don't pass `--env-file` or `--env-file-if-exists`: those are Node.js options, so Node reads that file itself before blastradius starts. blastradius exits with code 2 if it sees them.
 
 </details>
 
@@ -187,7 +189,7 @@ Exit codes: `0` ok, `1` `--fail-on` threshold reached, `2` usage error, `70` int
 
 ```sh
 npm ci
-npm run typecheck && npm run lint && npm test && npm run build
+npm run typecheck && npm run lint && npm test && npm run build && npm run test:bin
 npm run fixtures
 node dist/cli.js --dir .fixtures/basic --offline
 ```

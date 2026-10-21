@@ -28,7 +28,7 @@ services and checks live, read-only, what each one can do.
 
 Options:
   -d, --dir <path>        Directory to scan (default: current directory)
-  -f, --env-file <name>   Only read this file (repeatable). Default: all .env* files
+  -f, --file <name>       Only read this file inside --dir (repeatable). Default: all .env* files
       --offline           Do not call any API; report what can be inferred
       --json              Print the report as JSON
       --fail-on <level>   Exit 1 if any credential is at least red|amber
@@ -39,11 +39,36 @@ Options:
 Secrets are never printed, logged or sent anywhere except the API that issued them.
 `;
 
+/**
+ * Node itself treats these as its own options even after the script name
+ * (nodejs/node#54232) and reads the file before this code runs, so the only
+ * real protection is that blastradius never asks for them. Rejecting them
+ * here makes sure nobody relies on them by accident.
+ */
+const NODE_OWNED_FLAGS = ["--env-file", "--env-file-if-exists"] as const;
+
+function nodeOwnedFlag(argv: readonly string[]): string | undefined {
+  for (const arg of argv) {
+    for (const flag of NODE_OWNED_FLAGS) {
+      if (arg === flag || arg.startsWith(`${flag}=`)) return flag;
+    }
+  }
+  return undefined;
+}
+
 function isLevel(s: string): s is Level {
   return s === "red" || s === "amber" || s === "green";
 }
 
 export async function main(argv: readonly string[], io: Io): Promise<number> {
+  const owned = nodeOwnedFlag(argv);
+  if (owned !== undefined) {
+    io.stderr(
+      `blastradius: ${owned} is a Node.js option, not a blastradius option. Node reads that file before blastradius starts.\n` +
+        "Use -f/--file <name> to pick which file in --dir to scan.\n",
+    );
+    return EXIT.usage;
+  }
   let parsed;
   try {
     parsed = parseArgs({
@@ -52,7 +77,7 @@ export async function main(argv: readonly string[], io: Io): Promise<number> {
       strict: true,
       options: {
         dir: { type: "string", short: "d" },
-        "env-file": { type: "string", short: "f", multiple: true },
+        file: { type: "string", short: "f", multiple: true },
         offline: { type: "boolean", default: false },
         json: { type: "boolean", default: false },
         "fail-on": { type: "string" },
@@ -79,9 +104,9 @@ export async function main(argv: readonly string[], io: Io): Promise<number> {
     io.stderr("blastradius: --fail-on must be red or amber\n");
     return EXIT.usage;
   }
-  const envFiles = v["env-file"];
+  const envFiles = v.file;
   if (envFiles?.some((f) => f.includes("/") || f.includes("\\"))) {
-    io.stderr("blastradius: --env-file takes a file name inside --dir, not a path\n");
+    io.stderr("blastradius: --file takes a file name inside --dir, not a path\n");
     return EXIT.usage;
   }
 
