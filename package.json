@@ -28,11 +28,11 @@
   },
   "scripts": {
     "prebuild": "node scripts/gen-connectors.mjs",
-    "build": "node ./node_modules/typescript/bin/tsc -p tsconfig.build.json && node scripts/chmod-bin.mjs",
+    "build": "node ./node_modules/typescript-7/bin/tsc -p tsconfig.build.json && node scripts/chmod-bin.mjs",
     "prepare": "npm run build",
     "prepublishOnly": "node -e \"console.error('This package is private and is not published to npm.'); process.exit(1)\"",
     "pretypecheck": "node scripts/gen-connectors.mjs",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "node ./node_modules/typescript-7/bin/tsc -p tsconfig.json --noEmit",
     "prelint": "node scripts/gen-connectors.mjs",
     "lint": "eslint .",
     "pretest": "node scripts/gen-connectors.mjs",
@@ -62,7 +62,8 @@
     "@eslint/js": "^10.0.1",
     "@types/node": "^22.20.5",
     "eslint": "^10.13.0",
-    "typescript": "^5.9.3",
+    "typescript": "npm:@typescript/typescript6@^6.0.2",
+    "typescript-7": "npm:typescript@^7.0.2",
     "typescript-eslint": "^8.72.0",
     "vitest": "^5.0.5"
   },

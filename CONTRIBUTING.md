@@ -56,6 +56,13 @@ git URL (`npm install -g github:…`) fails prepare today; a project-local
 
 ## Local checks
 
+Builds and typechecks use TypeScript 7. The `typescript` dependency aliases
+`@typescript/typescript6` to provide the compiler API required by typescript-eslint;
+`typescript-7` supplies the native compiler. Both scripts invoke that compiler
+explicitly because npm's `tsc` bin can resolve to the compatibility dependency.
+Keep these separate until the lint tooling supports TypeScript 7's API. Do not bypass peer
+dependency checks with `--force` or `--legacy-peer-deps`.
+
 ```sh
 npm ci
 npm run check   # typecheck + lint + test + build
